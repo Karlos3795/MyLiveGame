@@ -1,0 +1,4 @@
+__pycache__/
+*.csv
+prompt.txt
+web/data/

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MISIONES — Registro de campaña</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-tipo="principales">
+  <div class="fondo-rejilla" aria-hidden="true"></div>
+  <div class="fondo-brillo" aria-hidden="true"></div>
+
+  <header class="hud">
+    <div class="marca">
+      <span class="sigilo" aria-hidden="true">◆</span>
+      <div>
+        <h1>MISIONES</h1>
+        <p class="lema-app">Registro de campaña personal · versión web</p>
+      </div>
+    </div>
+    <div class="hud-derecha">
+      <div class="stat">
+        <span class="stat-etiqueta">COMPLETADAS</span>
+        <span class="stat-valor" id="stat-completadas">0</span>
+      </div>
+      <a class="btn-csv" href="/api/csv" id="btn-csv" download>Descargar CSV</a>
+    </div>
+  </header>
+
+  <nav class="pestanas" role="tablist" aria-label="Tipos de misión">
+    <button class="pestana activa" data-tipo="principales" role="tab">
+      <span class="pestana-icono" aria-hidden="true">★</span>
+      <span class="pestana-texto">Principales</span>
+      <span class="pestana-contador" data-contador="principales">0</span>
+    </button>
+    <button class="pestana" data-tipo="secundarias" role="tab">
+      <span class="pestana-icono" aria-hidden="true">⟡</span>
+      <span class="pestana-texto">Secundarias</span>
+      <span class="pestana-contador" data-contador="secundarias">0</span>
+    </button>
+    <button class="pestana" data-tipo="campo" role="tab">
+      <span class="pestana-icono" aria-hidden="true">⚑</span>
+      <span class="pestana-texto">De Campo</span>
+      <span class="pestana-contador" data-contador="campo">0</span>
+    </button>
+    <button class="pestana" data-tipo="diarias" role="tab">
+      <span class="pestana-icono" aria-hidden="true">☀</span>
+      <span class="pestana-texto">Diarias</span>
+      <span class="pestana-contador" data-contador="diarias">0</span>
+    </button>
+  </nav>
+
+  <main class="tablero">
+    <section class="panel">
+      <div class="panel-cabecera">
+        <div>
+          <h2 id="titulo-seccion">Principales</h2>
+          <p class="panel-lema" id="lema-seccion">La ruta crítica de tu campaña.</p>
+        </div>
+        <button class="btn-primario" id="btn-nueva">
+          <span aria-hidden="true">+</span> Nueva misión
+        </button>
+      </div>
+
+      <ul class="lista-misiones" id="lista"></ul>
+
+      <div class="vacio" id="vacio" hidden>
+        <span class="vacio-icono" aria-hidden="true">◇</span>
+        <p class="vacio-titulo">Sin misiones activas</p>
+        <p class="vacio-texto">Añade la primera y empieza a avanzar.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <span>Versión web: los datos viven en el servidor. Las completadas se archivan en <code>data/misiones_completadas.csv</code></span>
+  </footer>
+
+  <dialog id="dialogo" class="dialogo">
+    <form id="form-mision" novalidate>
+      <header class="dialogo-cabecera">
+        <div>
+          <p class="dialogo-etiqueta" id="dialogo-tipo">PRINCIPALES</p>
+          <h3>Nueva misión</h3>
+        </div>
+        <button type="button" class="btn-cerrar" id="btn-cerrar" aria-label="Cerrar">×</button>
+      </header>
+
+      <label class="campo">
+        <span>Título <b aria-hidden="true">*</b></span>
+        <input type="text" id="campo-titulo" maxlength="160" placeholder="Ej. Terminar el informe del trimestre" autocomplete="off" required>
+      </label>
+
+      <label class="campo">
+        <span>Descripción <em>(opcional)</em></span>
+        <textarea id="campo-descripcion" rows="3" maxlength="1000" placeholder="Detalles, recompensas, notas…"></textarea>
+      </label>
+
+      <div class="campos-fila">
+        <label class="campo">
+          <span>Fecha inicio <em>(opcional)</em></span>
+          <input type="date" id="campo-inicio">
+        </label>
+        <label class="campo">
+          <span>Fecha fin <em>(opcional)</em></span>
+          <input type="date" id="campo-fin">
+        </label>
+      </div>
+
+      <p class="form-error" id="form-error" role="alert" hidden></p>
+
+      <footer class="dialogo-pie">
+        <button type="button" class="btn-secundario" id="btn-cancelar">Cancelar</button>
+        <button type="submit" class="btn-primario">Desplegar misión</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+
+  <script src="almacen.js"></script>
+  <script src="nucleo.js"></script>
+</body>
+</html>
