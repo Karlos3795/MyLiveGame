@@ -43,6 +43,10 @@ La app queda con icono propio y, tras la primera visita, funciona sin conexión.
   fecha fin (hora local). Requieren permiso del navegador; se comprueban mientras
   la app está abierta y en primer plano. Sin servicio push, no se garantizan con
   la app cerrada o en segundo plano.
+- Editor de fases con flechas de dependencia, peso/valor y desbloqueo por
+  predecesoras completadas; permite ramas y uniones. Las misiones con fases solo
+  se pueden completar cuando todas las fases estén terminadas.
+- Cambio de categoría de una misión desde el botón de ajustes.
 - **Almacenamiento local** (`localStorage`): no sale nada del dispositivo.
 - **Descargar CSV** generado al momento, con las mismas columnas que la web.
 - **Copia de seguridad** en JSON (exportar/importar) para cambiar de móvil,

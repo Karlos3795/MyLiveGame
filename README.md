@@ -12,7 +12,9 @@ Las dos permiten crear misiones en las secciones **Principales**,
 **Secundarias**, **De Campo** y **Diarias**, completarlas, ver el contador y
 descargar el CSV de completadas. Al crear una misión también se pueden activar
 avisos para sus fechas de inicio/fin; los ajustes avanzados incluyen el acceso
-preparado para añadir fases posteriormente.
+al editor visual de fases y sus dependencias. Las fases se desbloquean cuando
+se han completado todas sus predecesoras. También se puede cambiar la categoría
+de una misión desde su botón de ajustes.
 
 ## Arrancar la versión web
 

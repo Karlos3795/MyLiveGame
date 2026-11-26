@@ -139,7 +139,7 @@
         <summary><span>Ajustes avanzados</span><span class="chevron" aria-hidden="true">⌄</span></summary>
         <div class="avanzados-contenido">
           <p>Opciones adicionales para personalizar esta misión.</p>
-          <button type="button" class="btn-fase" id="btn-anadir-fase"><span aria-hidden="true">＋</span> Añadir fase <span class="proximamente">Próximamente</span></button>
+          <button type="button" class="btn-fase" id="btn-anadir-fase">＋ Añadir fases</button>
         </div>
       </details>
 
@@ -148,6 +148,84 @@
       <footer class="dialogo-pie">
         <button type="button" class="btn-secundario" id="btn-cancelar">Cancelar</button>
         <button type="submit" class="btn-primario">Desplegar misión</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="dialogo-editor-fases" class="dialogo dialogo-editor">
+    <section class="editor-fases">
+      <header class="dialogo-cabecera">
+        <div>
+          <p class="dialogo-etiqueta">DISEÑO DE MISIÓN</p>
+          <h3>Editor de fases</h3>
+        </div>
+        <button type="button" class="btn-cerrar" id="btn-cerrar-editor-fases" aria-label="Cerrar editor">×</button>
+      </header>
+      <p class="editor-ayuda">Añade fases al lienzo y arrastra con <b>Flechas</b> para conectarlas; usa <b>Borrar flecha</b> para quitarlas. Sin flechas entrantes son iniciales; con varias entradas, deben completarse todas las predecesoras.</p>
+      <div class="editor-herramientas">
+        <button type="button" class="btn-primario" id="btn-crear-fase">＋ Añadir fase</button>
+        <button type="button" class="btn-secundario" id="btn-conectar-fases" aria-pressed="false">↗ Flechas</button>
+        <button type="button" class="btn-secundario" id="btn-borrar-flecha" aria-pressed="false">⌫ Borrar flecha</button>
+        <span id="editor-modo" class="editor-modo">Pulsa «Añadir fase» para colocar una fase.</span>
+      </div>
+      <div class="lienzo-scroll" id="lienzo-scroll" aria-label="Lienzo de fases">
+        <div class="lienzo-fases" id="lienzo-fases">
+          <svg class="lienzo-flechas" id="lienzo-flechas" aria-hidden="true"></svg>
+          <div class="lienzo-nodos" id="lienzo-nodos"></div>
+        </div>
+      </div>
+      <p class="form-error" id="editor-error" role="alert" hidden></p>
+      <footer class="dialogo-pie">
+        <button type="button" class="btn-secundario" id="btn-cancelar-editor-fases">Cancelar</button>
+        <button type="button" class="btn-primario" id="btn-confirmar-fases">Confirmar fases</button>
+      </footer>
+    </section>
+  </dialog>
+
+  <dialog id="dialogo-ajuste-fase" class="dialogo dialogo-ajuste-fase">
+    <form id="form-ajuste-fase" novalidate>
+      <header class="dialogo-cabecera">
+        <div><p class="dialogo-etiqueta">AJUSTES DE FASE</p><h3>Editar fase</h3></div>
+        <button type="button" class="btn-cerrar" id="btn-cerrar-ajuste-fase" aria-label="Cerrar">×</button>
+      </header>
+      <label class="campo"><span>Título <b aria-hidden="true">*</b></span><input id="ajuste-fase-titulo" maxlength="160" required></label>
+      <label class="campo"><span>Descripción <em>(opcional)</em></span><textarea id="ajuste-fase-descripcion" rows="3" maxlength="1000"></textarea></label>
+      <div class="campos-fila">
+        <label class="campo"><span>Fecha inicio</span><input type="date" id="ajuste-fase-inicio"></label>
+        <label class="campo"><span>Fecha fin</span><input type="date" id="ajuste-fase-fin"></label>
+      </div>
+      <div class="campos-fila ajuste-fase-opciones">
+        <label class="opcion-check"><input type="checkbox" id="ajuste-fase-aviso-inicio"> Avisarme al inicio · 00:00</label>
+        <label class="opcion-check"><input type="checkbox" id="ajuste-fase-aviso-fin"> Avisarme al fin · 23:59</label>
+      </div>
+      <label class="campo"><span>Peso / valor de la fase</span><input type="number" id="ajuste-fase-valor" min="0" step="0.1" value="1"></label>
+      <p class="form-error" id="ajuste-fase-error" role="alert" hidden></p>
+      <footer class="dialogo-pie">
+        <button type="button" class="btn-secundario" id="btn-eliminar-fase">Eliminar fase</button>
+        <button type="button" class="btn-secundario" id="btn-cancelar-ajuste-fase">Cancelar</button>
+        <button type="submit" class="btn-primario">Guardar fase</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="dialogo-grado" class="dialogo dialogo-grado">
+    <form id="form-grado" novalidate>
+      <header class="dialogo-cabecera">
+        <div><p class="dialogo-etiqueta">CLASIFICACIÓN</p><h3>Cambiar categoría</h3></div>
+        <button type="button" class="btn-cerrar" id="btn-cerrar-grado" aria-label="Cerrar">×</button>
+      </header>
+      <label class="campo"><span>Nueva categoría</span>
+        <select id="grado-destino">
+          <option value="principales">Principales</option>
+          <option value="secundarias">Secundarias</option>
+          <option value="campo">De Campo</option>
+          <option value="diarias">Diarias</option>
+        </select>
+      </label>
+      <p class="form-error" id="grado-error" role="alert" hidden></p>
+      <footer class="dialogo-pie">
+        <button type="button" class="btn-secundario" id="btn-cancelar-grado">Cancelar</button>
+        <button type="submit" class="btn-primario">Guardar categoría</button>
       </footer>
     </form>
   </dialog>

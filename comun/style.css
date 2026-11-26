@@ -354,6 +354,25 @@ button.btn-csv {
 .mision-meta .dato-aviso { color: var(--acento); }
 .mision-meta .dato-aviso::before { content: "◉ "; }
 
+.mision-fases { margin-top: 12px; border: 1px solid var(--borde); border-radius: 9px; background: rgba(3, 7, 13, .32); }
+.mision-fases > summary { padding: 9px 11px; color: var(--acento); font: 10px var(--fuente-mono); letter-spacing: .07em; cursor: pointer; list-style: none; }
+.mision-fases > summary::-webkit-details-marker { display: none; }
+.mision-fases > summary::before { content: "▸ "; }
+.mision-fases[open] > summary { border-bottom: 1px solid var(--borde); }
+.lista-fases-activas { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 9px; list-style: none; }
+.fase-activa { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--acento) 25%, var(--borde)); border-radius: 9px; background: var(--panel-alto); }
+.fase-activa-info { min-width: 0; }
+.fase-activa-info strong { display: block; font-size: 13px; }
+.fase-activa-info p { margin: 3px 0; color: var(--texto-suave); font-size: 12px; white-space: pre-wrap; }
+.fase-activa-info small { color: var(--texto-tenue); font: 10px var(--fuente-mono); }
+.btn-completar-fase { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--acento); border-radius: 8px; background: var(--acento-tenue); color: var(--acento); font: 10px var(--fuente-mono); cursor: pointer; touch-action: manipulation; }
+.btn-completar-fase:hover { background: var(--acento); color: #080b12; }
+.btn-completar-fase:disabled { opacity: .5; cursor: progress; }
+.fases-sin-activas { padding: 8px; color: var(--texto-suave); font-size: 12px; }
+.mision-acciones { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.btn-ajustes-mision { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--borde); border-radius: 9px; background: transparent; color: var(--texto-suave); font-size: 17px; cursor: pointer; touch-action: manipulation; }
+.btn-ajustes-mision:hover { color: var(--acento); border-color: var(--acento); background: var(--acento-tenue); }
+
 .btn-completar {
   flex-shrink: 0;
   font-family: var(--fuente-mono);
@@ -646,6 +665,43 @@ button.btn-csv {
   border-top: 1px dashed var(--borde);
 }
 
+/* ---------- Editor visual de fases ---------- */
+.dialogo-editor { width: min(1120px, calc(100% - 24px)); }
+.editor-fases { padding: 22px; }
+.editor-fases .dialogo-cabecera { margin-bottom: 8px; }
+.editor-ayuda { margin: 0 0 14px; color: var(--texto-suave); font-size: 13px; }
+.editor-ayuda b { color: var(--acento); }
+.editor-herramientas { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 12px; }
+.editor-herramientas .btn-primario, .editor-herramientas .btn-secundario { width: auto; }
+.editor-herramientas .btn-secundario.activo { border-color: var(--acento); color: var(--acento); background: var(--acento-tenue); }
+.editor-modo { flex: 1; min-width: 200px; color: var(--texto-tenue); font-size: 11.5px; }
+.lienzo-scroll { max-height: min(58vh, 650px); overflow: auto; border: 1px solid var(--borde); border-radius: 12px; background: #080d16; overscroll-behavior: contain; }
+.lienzo-fases { position: relative; width: 1180px; height: 620px; overflow: hidden; background-image: linear-gradient(rgba(120,160,220,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,220,.055) 1px, transparent 1px); background-size: 24px 24px; }
+.lienzo-flechas, .lienzo-nodos { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lienzo-flechas { z-index: 1; overflow: visible; pointer-events: none; }
+.lienzo-nodos { z-index: 2; pointer-events: none; }
+.flecha-fase { fill: none; stroke: var(--acento); stroke-width: 2.5; opacity: .9; }
+.lienzo-fases.modo-borrar-flecha .flecha-fase { pointer-events: stroke; cursor: crosshair; stroke-width: 5; }
+.fase-nodo { position: absolute; display: flex; flex-direction: column; gap: 8px; width: 250px; min-height: 142px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--acento) 60%, var(--borde)); border-left: 4px solid var(--acento); border-radius: 13px; background: linear-gradient(145deg, #151f2f, #0d1420); color: var(--texto); box-shadow: 0 12px 30px rgba(0,0,0,.36); cursor: grab; pointer-events: auto; touch-action: none; user-select: none; transition: box-shadow .15s ease, border-color .15s ease; }
+.fase-nodo:hover, .fase-nodo.fase-seleccionada { box-shadow: 0 0 0 3px var(--acento-tenue), 0 14px 32px rgba(0,0,0,.42); }
+.fase-nodo.fase-arrastrando { cursor: grabbing; z-index: 3; box-shadow: 0 16px 38px rgba(0,0,0,.55); }
+.fase-nodo-cabecera { display: flex; justify-content: space-between; align-items: center; margin: -4px -4px 0 0; }
+.fase-nodo-numero { color: var(--acento); font: 10px var(--fuente-mono); letter-spacing: .14em; }
+.fase-nodo-ajustes { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--borde); border-radius: 9px; background: #0a101a; color: var(--texto-suave); font-size: 16px; cursor: pointer; touch-action: manipulation; }
+.fase-nodo-ajustes:hover { color: var(--acento); border-color: var(--acento); }
+.fase-nodo-titulo { overflow: hidden; color: var(--texto); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.fase-nodo-fechas, .fase-nodo-valor { color: var(--texto-tenue); font: 10px var(--fuente-mono); }
+.fase-nodo-valor { color: var(--acento); }
+.dialogo-ajuste-fase { width: min(560px, calc(100% - 28px)); }
+#form-ajuste-fase, #form-grado { padding: 22px 24px 20px; }
+.ajuste-fase-opciones { margin-bottom: 12px; }
+.opcion-check { display: flex; align-items: center; gap: 8px; min-height: 40px; color: var(--texto-suave); font-size: 12px; }
+.opcion-check input { accent-color: var(--acento); width: 18px; height: 18px; }
+.dialogo-ajuste-fase input[type="date"], .dialogo-grado select { color-scheme: dark; }
+.dialogo-grado { width: min(460px, calc(100% - 28px)); }
+.dialogo-grado select { width: 100%; padding: 11px 12px; border: 1px solid var(--borde); border-radius: 9px; background: #0a0f18; color: var(--texto); font: inherit; }
+.dialogo-grado select:focus { outline: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-tenue); }
+
 /* ---------- Aviso ---------- */
 .aviso {
   position: fixed;
@@ -677,8 +733,19 @@ button.btn-csv {
   .panel-cabecera { flex-direction: column; }
   .btn-primario { width: 100%; }
   .mision { flex-direction: column; align-items: stretch; gap: 12px; }
-  .btn-completar { width: 100%; }
+  .mision-acciones { width: 100%; }
+  .mision-acciones .btn-completar { flex: 1; width: auto; }
+  .fase-activa { align-items: stretch; flex-direction: column; }
+  .btn-completar-fase { min-height: 40px; }
   .campos-fecha { grid-template-columns: 1fr; gap: 0; }
   .fecha-control { gap: 8px; }
+  .editor-fases { padding: 16px; }
+  .editor-fases .dialogo-pie { flex-direction: column-reverse; }
+  .editor-fases .dialogo-pie button { width: 100%; }
+  .editor-herramientas .btn-primario, .editor-herramientas .btn-secundario { min-height: 42px; }
+  .editor-modo { min-width: 100%; }
+  .dialogo-ajuste-fase .dialogo-pie, .dialogo-grado .dialogo-pie { flex-wrap: wrap; }
+  .dialogo-ajuste-fase .dialogo-pie button { flex: 1 1 40%; }
+  #btn-eliminar-fase { flex-basis: 100% !important; }
   .pie { font-size: 10.5px; }
 }

@@ -42,10 +42,24 @@ window.Almacen = {
     });
   },
 
-  marcarNotificada(tipo, id, extremo, fecha) {
+  marcarNotificada(tipo, id, extremo, fecha, idFase = "") {
     return pedir("/api/misiones/notificada", {
       method: "POST",
-      body: JSON.stringify({ tipo, id, extremo, fecha }),
+      body: JSON.stringify({ tipo, id, extremo, fecha, id_fase: idFase }),
+    });
+  },
+
+  completarFase(tipo, id, idFase) {
+    return pedir("/api/misiones/fase/completar", {
+      method: "POST",
+      body: JSON.stringify({ tipo, id, id_fase: idFase }),
+    });
+  },
+
+  cambiarTipo(tipoOrigen, id, tipoDestino) {
+    return pedir("/api/misiones/cambiar-tipo", {
+      method: "POST",
+      body: JSON.stringify({ tipo_origen: tipoOrigen, id, tipo_destino: tipoDestino }),
     });
   },
 

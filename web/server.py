@@ -21,6 +21,7 @@ MISIONES_JSON = os.path.join(DATA_DIR, "misiones.json")
 CSV_PATH = os.path.join(DATA_DIR, "misiones_completadas.csv")
 
 TIPOS = ("principales", "secundarias", "campo", "diarias")
+MAX_FASES = 100
 
 # Orden exacto de columnas pedido para el CSV.
 CSV_HEADER = [
@@ -84,6 +85,102 @@ def contar_completadas():
     with _lock:
         with open(CSV_PATH, "r", encoding="utf-8", newline="") as f:
             return max(0, sum(1 for _ in csv.reader(f)) - 1)
+
+
+def validar_fecha(valor, etiqueta, hoy):
+    if not valor:
+        return ""
+    try:
+        fecha = datetime.strptime(valor, "%Y-%m-%d")
+    except ValueError as error:
+        raise ValueError(f"La fecha {etiqueta} no es válida") from error
+    if fecha.strftime("%Y-%m-%d") != valor:
+        raise ValueError(f"La fecha {etiqueta} no es válida")
+    if etiqueta.endswith("inicio") and valor < hoy:
+        raise ValueError(f"La fecha {etiqueta} no puede ser anterior a hoy")
+    return valor
+
+
+def normalizar_fases(fases, hoy):
+    if fases is None:
+        return []
+    if not isinstance(fases, list) or len(fases) > MAX_FASES:
+        raise ValueError(f"La misión admite hasta {MAX_FASES} fases")
+    resultado = []
+    ids = set()
+    for indice, fase in enumerate(fases):
+        if not isinstance(fase, dict):
+            raise ValueError("Los datos de una fase no son válidos")
+        fid = str(fase.get("id", "")).strip()[:40] or uuid.uuid4().hex[:12]
+        if fid in ids:
+            raise ValueError("Hay identificadores de fase duplicados")
+        ids.add(fid)
+        titulo = str(fase.get("titulo", "")).strip()[:160]
+        if not titulo:
+            raise ValueError(f"La fase {indice + 1} necesita un título")
+        inicio = validar_fecha(str(fase.get("fecha_inicio", "")).strip()[:10], "de inicio", hoy)
+        fin = validar_fecha(str(fase.get("fecha_fin", "")).strip()[:10], "de fin", hoy)
+        if inicio and fin and fin < inicio:
+            raise ValueError(f"La fecha fin de «{titulo}» no puede ser anterior a su inicio")
+        try:
+            valor = float(fase.get("valor", 1))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"El valor de «{titulo}» debe ser numérico") from error
+        if valor < 0 or valor != valor or valor == float("inf"):
+            raise ValueError(f"El valor de «{titulo}» debe ser mayor o igual que cero")
+        resultado.append({
+            "id": fid,
+            "titulo": titulo,
+            "descripcion": str(fase.get("descripcion", "")).strip()[:1000],
+            "fecha_inicio": inicio,
+            "fecha_fin": fin,
+            "notificar_inicio": bool(fase.get("notificar_inicio", False)),
+            "notificar_fin": bool(fase.get("notificar_fin", False)),
+            "notificado_inicio": "",
+            "notificado_fin": "",
+            "valor": valor,
+            "x": max(8, min(930, int(fase.get("x", 24)))),
+            "y": max(8, min(460, int(fase.get("y", 24)))),
+            "completada": False,
+            "fecha_completada": "",
+        })
+    return resultado
+
+
+def normalizar_dependencias(dependencias, fases):
+    if dependencias is None:
+        return []
+    if not isinstance(dependencias, list) or len(dependencias) > MAX_FASES * 4:
+        raise ValueError("La lista de flechas no es válida")
+    ids = {fase["id"] for fase in fases}
+    resultado = []
+    unicas = set()
+    salidas = {fid: [] for fid in ids}
+    grados = {fid: 0 for fid in ids}
+    for arista in dependencias:
+        if not isinstance(arista, dict):
+            raise ValueError("Hay una flecha inválida entre fases")
+        desde = str(arista.get("desde", ""))
+        hasta = str(arista.get("hasta", ""))
+        clave = (desde, hasta)
+        if desde not in ids or hasta not in ids or desde == hasta or clave in unicas:
+            raise ValueError("Hay una flecha inválida o repetida entre fases")
+        unicas.add(clave)
+        salidas[desde].append(hasta)
+        grados[hasta] += 1
+        resultado.append({"desde": desde, "hasta": hasta})
+    pendientes = [fid for fid, grado in grados.items() if grado == 0]
+    visitadas = 0
+    while pendientes:
+        actual = pendientes.pop()
+        visitadas += 1
+        for siguiente in salidas[actual]:
+            grados[siguiente] -= 1
+            if grados[siguiente] == 0:
+                pendientes.append(siguiente)
+    if visitadas != len(ids):
+        raise ValueError("Las dependencias entre fases no pueden formar ciclos")
+    return resultado
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -211,6 +308,12 @@ class Handler(BaseHTTPRequestHandler):
             if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
                 self._error("La fecha fin no puede ser anterior a la fecha inicio")
                 return
+            try:
+                fases = normalizar_fases(datos.get("fases", []), fecha_hoy_local)
+                dependencias = normalizar_dependencias(datos.get("dependencias", []), fases)
+            except (TypeError, ValueError, OverflowError) as error:
+                self._error(str(error))
+                return
             mision = {
                 "id": uuid.uuid4().hex[:10],
                 "titulo": titulo[:160],
@@ -221,6 +324,8 @@ class Handler(BaseHTTPRequestHandler):
                 "notificar_fin": bool(datos.get("notificar_fin", False)),
                 "notificado_inicio": "",
                 "notificado_fin": "",
+                "fases": fases,
+                "dependencias": dependencias,
                 "creada": datetime.now().isoformat(timespec="seconds"),
             }
             data = cargar_misiones()
@@ -234,6 +339,7 @@ class Handler(BaseHTTPRequestHandler):
             mid = str(datos.get("id", "")).strip()
             extremo = str(datos.get("extremo", "")).strip()
             fecha = str(datos.get("fecha", "")).strip()[:10]
+            fid = str(datos.get("id_fase", "")).strip()
             if tipo not in TIPOS or extremo not in ("inicio", "fin") or not fecha:
                 self._error("Datos de notificación no válidos")
                 return
@@ -242,9 +348,68 @@ class Handler(BaseHTTPRequestHandler):
             if encontrada is None:
                 self._error("Misión no encontrada", 404)
                 return
-            encontrada["notificado_" + extremo] = fecha
+            if fid:
+                fase = next((f for f in encontrada.get("fases", []) if f.get("id") == fid), None)
+                if fase is None:
+                    self._error("Fase no encontrada", 404)
+                    return
+                fase["notificado_" + extremo] = fecha
+            else:
+                encontrada["notificado_" + extremo] = fecha
             guardar_misiones(data)
             self._json({"ok": True})
+            return
+
+        if ruta == "/api/misiones/fase/completar":
+            tipo = str(datos.get("tipo", "")).strip()
+            mid = str(datos.get("id", "")).strip()
+            fid = str(datos.get("id_fase", "")).strip()
+            if tipo not in TIPOS:
+                self._error("Tipo de misión no válido")
+                return
+            data = cargar_misiones()
+            mision = next((m for m in data[tipo] if m.get("id") == mid), None)
+            if mision is None:
+                self._error("Misión no encontrada", 404)
+                return
+            fase = next((f for f in mision.get("fases", []) if f.get("id") == fid), None)
+            if fase is None:
+                self._error("Fase no encontrada", 404)
+                return
+            previas = [a for a in mision.get("dependencias", []) if a.get("hasta") == fid]
+            anteriores_pendientes = [
+                a for a in previas
+                if not any(f.get("id") == a.get("desde") and f.get("completada") for f in mision.get("fases", []))
+            ]
+            if anteriores_pendientes:
+                self._error("Primero debes completar todas las fases anteriores", 409)
+                return
+            if not fase.get("completada"):
+                fase["completada"] = True
+                fase["fecha_completada"] = datetime.now().isoformat(timespec="seconds")
+                guardar_misiones(data)
+            self._json({"ok": True, "fase": fase})
+            return
+
+        if ruta == "/api/misiones/cambiar-tipo":
+            origen = str(datos.get("tipo_origen", "")).strip()
+            destino = str(datos.get("tipo_destino", "")).strip()
+            mid = str(datos.get("id", "")).strip()
+            if origen not in TIPOS or destino not in TIPOS:
+                self._error("Categoría de misión no válida")
+                return
+            if origen == destino:
+                self._json({"ok": True})
+                return
+            data = cargar_misiones()
+            mision = next((m for m in data[origen] if m.get("id") == mid), None)
+            if mision is None:
+                self._error("Misión no encontrada", 404)
+                return
+            data[origen].remove(mision)
+            data[destino].append(mision)
+            guardar_misiones(data)
+            self._json({"ok": True, "mision": mision})
             return
 
         if ruta == "/api/misiones/completar":
@@ -261,6 +426,9 @@ class Handler(BaseHTTPRequestHandler):
                     break
             if encontrada is None:
                 self._error("Mision no encontrada", 404)
+                return
+            if any(not fase.get("completada") for fase in encontrada.get("fases", [])):
+                self._error("Completa todas las fases antes de cerrar esta misión", 409)
                 return
             encontrada["fecha_completada"] = datetime.now().isoformat(timespec="seconds")
             añadir_al_csv(encontrada)
