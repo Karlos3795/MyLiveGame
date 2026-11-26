@@ -99,6 +99,7 @@
         <button type="button" class="btn-cerrar" id="btn-cerrar" aria-label="Cerrar">×</button>
       </header>
 
+      <p class="grupo-ajustes-titulo">Ajustes normales</p>
       <label class="campo">
         <span>Título <b aria-hidden="true">*</b></span>
         <input type="text" id="campo-titulo" maxlength="160" placeholder="Ej. Terminar el informe del trimestre" autocomplete="off" required>
@@ -109,16 +110,38 @@
         <textarea id="campo-descripcion" rows="3" maxlength="1000" placeholder="Detalles, recompensas, notas…"></textarea>
       </label>
 
-      <div class="campos-fila">
-        <label class="campo">
-          <span>Fecha inicio <em>(opcional)</em></span>
-          <input type="date" id="campo-inicio">
-        </label>
-        <label class="campo">
-          <span>Fecha fin <em>(opcional)</em></span>
-          <input type="date" id="campo-fin">
-        </label>
+      <div class="campos-fecha">
+        <div class="campo campo-fecha">
+          <label for="campo-inicio">Fecha inicio <em>(opcional)</em></label>
+          <div class="fecha-control">
+            <input type="date" id="campo-inicio">
+            <label class="opcion-aviso" for="aviso-inicio">
+              <input type="checkbox" id="aviso-inicio" disabled>
+              <span class="radio-aviso" aria-hidden="true"></span>
+              <span>Avisarme</span>
+            </label>
+          </div>
+        </div>
+        <div class="campo campo-fecha">
+          <label for="campo-fin">Fecha fin <em>(opcional)</em></label>
+          <div class="fecha-control">
+            <input type="date" id="campo-fin">
+            <label class="opcion-aviso" for="aviso-fin">
+              <input type="checkbox" id="aviso-fin" disabled>
+              <span class="radio-aviso" aria-hidden="true"></span>
+              <span>Avisarme</span>
+            </label>
+          </div>
+        </div>
       </div>
+
+      <details class="ajustes-avanzados">
+        <summary><span>Ajustes avanzados</span><span class="chevron" aria-hidden="true">⌄</span></summary>
+        <div class="avanzados-contenido">
+          <p>Opciones adicionales para personalizar esta misión.</p>
+          <button type="button" class="btn-fase" id="btn-anadir-fase"><span aria-hidden="true">＋</span> Añadir fase <span class="proximamente">Próximamente</span></button>
+        </div>
+      </details>
 
       <p class="form-error" id="form-error" role="alert" hidden></p>
 

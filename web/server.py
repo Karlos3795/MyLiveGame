@@ -187,12 +187,34 @@ class Handler(BaseHTTPRequestHandler):
                 "descripcion": str(datos.get("descripcion", "")).strip()[:1000],
                 "fecha_inicio": str(datos.get("fecha_inicio", "")).strip()[:10],
                 "fecha_fin": str(datos.get("fecha_fin", "")).strip()[:10],
+                "notificar_inicio": bool(datos.get("notificar_inicio", False)),
+                "notificar_fin": bool(datos.get("notificar_fin", False)),
+                "notificado_inicio": "",
+                "notificado_fin": "",
                 "creada": datetime.now().isoformat(timespec="seconds"),
             }
             data = cargar_misiones()
             data[tipo].append(mision)
             guardar_misiones(data)
             self._json({"ok": True, "mision": mision}, 201)
+            return
+
+        if ruta == "/api/misiones/notificada":
+            tipo = str(datos.get("tipo", "")).strip()
+            mid = str(datos.get("id", "")).strip()
+            extremo = str(datos.get("extremo", "")).strip()
+            fecha = str(datos.get("fecha", "")).strip()[:10]
+            if tipo not in TIPOS or extremo not in ("inicio", "fin") or not fecha:
+                self._error("Datos de notificación no válidos")
+                return
+            data = cargar_misiones()
+            encontrada = next((m for m in data[tipo] if m.get("id") == mid), None)
+            if encontrada is None:
+                self._error("Misión no encontrada", 404)
+                return
+            encontrada["notificado_" + extremo] = fecha
+            guardar_misiones(data)
+            self._json({"ok": True})
             return
 
         if ruta == "/api/misiones/completar":

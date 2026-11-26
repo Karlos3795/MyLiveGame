@@ -351,6 +351,8 @@ button.btn-csv {
 }
 
 .mision-meta .dato::before { content: "▸ "; color: var(--acento); }
+.mision-meta .dato-aviso { color: var(--acento); }
+.mision-meta .dato-aviso::before { content: "◉ "; }
 
 .btn-completar {
   flex-shrink: 0;
@@ -415,6 +417,8 @@ button.btn-csv {
 /* ---------- Diálogo ---------- */
 .dialogo {
   width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
   padding: 0;
   border: 1px solid var(--borde);
   border-top: 2px solid var(--acento);
@@ -432,6 +436,17 @@ button.btn-csv {
 .dialogo[open] { animation: aparecer 0.22s ease both; }
 
 #form-mision { padding: 22px 24px 20px; }
+
+.grupo-ajustes-titulo {
+  margin: 0 0 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--borde);
+  color: var(--acento);
+  font-family: var(--fuente-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
 
 .dialogo-cabecera {
   display: flex;
@@ -467,7 +482,7 @@ button.btn-csv {
 
 .campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 
-.campo > span {
+.campo > span, .campo-fecha > label {
   font-family: var(--fuente-mono);
   font-size: 10.5px;
   letter-spacing: 0.1em;
@@ -476,7 +491,7 @@ button.btn-csv {
 }
 
 .campo > span b { color: var(--acento); }
-.campo > span em { color: var(--texto-tenue); font-style: normal; text-transform: none; letter-spacing: 0; }
+.campo > span em, .campo-fecha > label em { color: var(--texto-tenue); font-style: normal; text-transform: none; letter-spacing: 0; }
 
 .campo input, .campo textarea {
   width: 100%;
@@ -502,7 +517,103 @@ button.btn-csv {
 
 .campo input[type="date"] { color-scheme: dark; }
 
-.campos-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.campos-fecha { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.campo-fecha { min-width: 0; }
+.campo-fecha > label { cursor: pointer; }
+.fecha-control { display: flex; align-items: center; gap: 10px; }
+.fecha-control > input[type="date"] { flex: 1; min-width: 0; }
+
+.opcion-aviso {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--texto-suave);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.opcion-aviso input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.radio-aviso {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--texto-tenue);
+  border-radius: 50%;
+  transition: 0.18s ease;
+}
+
+.radio-aviso::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  transition: 0.18s ease;
+}
+
+.opcion-aviso input:checked + .radio-aviso { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-tenue); }
+.opcion-aviso input:checked + .radio-aviso::after { background: var(--acento); }
+.opcion-aviso input:focus-visible + .radio-aviso { outline: 2px solid var(--acento); outline-offset: 3px; }
+.opcion-aviso input:disabled ~ span { opacity: 0.4; }
+.opcion-aviso:has(input:disabled) { cursor: not-allowed; }
+
+.ajustes-avanzados {
+  margin: 2px 0 14px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.ajustes-avanzados summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 13px;
+  color: var(--texto-suave);
+  font-family: var(--fuente-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ajustes-avanzados summary::-webkit-details-marker { display: none; }
+.ajustes-avanzados summary:hover { color: var(--texto); }
+.ajustes-avanzados[open] summary { border-bottom: 1px solid var(--borde); color: var(--acento); }
+.chevron { font-size: 17px; transition: transform 0.18s ease; }
+.ajustes-avanzados[open] .chevron { transform: rotate(180deg); }
+.avanzados-contenido { padding: 12px 13px 14px; }
+.avanzados-contenido > p { margin: 0 0 11px; color: var(--texto-tenue); font-size: 12px; }
+
+.btn-fase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed var(--borde);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--texto-suave);
+  font-family: var(--fuente-mono);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.btn-fase:hover { border-color: var(--acento); color: var(--texto); }
+.btn-fase > span:first-child { color: var(--acento); font-size: 16px; }
+.proximamente { margin-left: auto; color: var(--texto-tenue); font-size: 9px; text-transform: uppercase; }
 
 .form-error {
   margin: 0 0 12px;
@@ -551,6 +662,7 @@ button.btn-csv {
   .btn-primario { width: 100%; }
   .mision { flex-direction: column; align-items: stretch; gap: 12px; }
   .btn-completar { width: 100%; }
-  .campos-fila { grid-template-columns: 1fr; }
+  .campos-fecha { grid-template-columns: 1fr; gap: 0; }
+  .fecha-control { gap: 8px; }
   .pie { font-size: 10.5px; }
 }

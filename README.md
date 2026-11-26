@@ -10,7 +10,9 @@ versiones independientes** que comparten la misma interfaz:
 
 Las dos permiten crear misiones en las secciones **Principales**,
 **Secundarias**, **De Campo** y **Diarias**, completarlas, ver el contador y
-descargar el CSV de completadas.
+descargar el CSV de completadas. Al crear una misión también se pueden activar
+avisos para sus fechas de inicio/fin; los ajustes avanzados incluyen el acceso
+preparado para añadir fases posteriormente.
 
 ## Arrancar la versión web
 
@@ -76,7 +78,8 @@ servidor). Por eso cada una tiene su copia de `nucleo.js` y `style.css`.
 
 1. Edita `comun/nucleo.js` o `comun/style.css`.
 2. Ejecuta `python3 sincronizar.py`.
-3. Prueba `web/` y `app/`.
+3. Prueba `web/` y `app/`; el script también sincroniza los archivos comunes y
+   el almacenamiento de la PWA publicada en `docs/`, y renueva su caché.
 
 Lo único específico de cada versión es su `index.html` y su `almacen.js`.
 Si añades una función nueva a la interfaz, va en `comun/nucleo.js`; si
@@ -95,3 +98,10 @@ Todo lo implementado usa herramientas gratuitas. No se ha contratado ni
 registrado nada de pago. Las únicas cosas opcionales que cuestan dinero son
 las tiendas de aplicaciones (Google Play y App Store) y los certificados de
 firma; están detalladas en [`app/README.md`](app/README.md#costes).
+
+### Avisos de fecha
+
+El navegador debe tener permiso para mostrar notificaciones. La app comprueba
+las fechas cuando está abierta y avisa ese día; como esta PWA no usa un servidor
+de notificaciones push, no puede garantizar avisos si está cerrada o el
+dispositivo está apagado.

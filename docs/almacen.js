@@ -44,6 +44,10 @@ function normalizarMisiones(datos) {
           descripcion: String(m.descripcion || "").slice(0, 1000),
           fecha_inicio: String(m.fecha_inicio || "").slice(0, 10),
           fecha_fin: String(m.fecha_fin || "").slice(0, 10),
+          notificar_inicio: Boolean(m.notificar_inicio),
+          notificar_fin: Boolean(m.notificar_fin),
+          notificado_inicio: String(m.notificado_inicio || "").slice(0, 10),
+          notificado_fin: String(m.notificado_fin || "").slice(0, 10),
           creada: String(m.creada || fechaAhora()),
         }));
     }
@@ -145,6 +149,10 @@ window.Almacen = {
       descripcion: String(datos.descripcion || "").trim().slice(0, 1000),
       fecha_inicio: String(datos.fecha_inicio || "").trim().slice(0, 10),
       fecha_fin: String(datos.fecha_fin || "").trim().slice(0, 10),
+      notificar_inicio: Boolean(datos.notificar_inicio),
+      notificar_fin: Boolean(datos.notificar_fin),
+      notificado_inicio: "",
+      notificado_fin: "",
       creada: fechaAhora(),
     };
     misiones[tipo].push(mision);
@@ -168,6 +176,18 @@ window.Almacen = {
     escribirJSON(CLAVE_COMPLETADAS, completadas);
     escribirJSON(CLAVE_MISIONES, misiones);
     return { ok: true, completadas: completadas.length };
+  },
+
+  async marcarNotificada(tipo, id, extremo, fecha) {
+    if (!TIPOS_APP.includes(tipo) || !["inicio", "fin"].includes(extremo)) {
+      throw new Error("Datos de notificación no válidos.");
+    }
+    const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
+    const mision = misiones[tipo].find((m) => m.id === id);
+    if (!mision) throw new Error("Misión no encontrada.");
+    mision[`notificado_${extremo}`] = String(fecha || "").slice(0, 10);
+    escribirJSON(CLAVE_MISIONES, misiones);
+    return { ok: true };
   },
 
   async descargarCSV() {

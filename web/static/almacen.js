@@ -42,6 +42,13 @@ window.Almacen = {
     });
   },
 
+  marcarNotificada(tipo, id, extremo, fecha) {
+    return pedir("/api/misiones/notificada", {
+      method: "POST",
+      body: JSON.stringify({ tipo, id, extremo, fecha }),
+    });
+  },
+
   async descargarCSV() {
     const enlace = document.createElement("a");
     enlace.href = "/api/csv";

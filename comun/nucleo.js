@@ -36,6 +36,7 @@ const estado = {
 const $ = (sel) => document.querySelector(sel);
 
 let temporizadorAviso = null;
+const avisosEmitidosEnSesion = new Set();
 
 /* ---------- Utilidades ---------- */
 function formatearFecha(iso) {
@@ -120,13 +121,28 @@ function render() {
     }
 
     const fechas = textoFechas(mision);
-    if (fechas) {
+    const tieneAvisos = mision.notificar_inicio || mision.notificar_fin;
+    if (fechas || tieneAvisos) {
       const meta = document.createElement("div");
       meta.className = "mision-meta";
-      const dato = document.createElement("span");
-      dato.className = "dato";
-      dato.textContent = fechas;
-      meta.appendChild(dato);
+      if (fechas) {
+        const dato = document.createElement("span");
+        dato.className = "dato";
+        dato.textContent = fechas;
+        meta.appendChild(dato);
+      }
+      if (mision.notificar_inicio) {
+        const avisoInicio = document.createElement("span");
+        avisoInicio.className = "dato-aviso";
+        avisoInicio.textContent = "Aviso de inicio";
+        meta.appendChild(avisoInicio);
+      }
+      if (mision.notificar_fin) {
+        const avisoFin = document.createElement("span");
+        avisoFin.className = "dato-aviso";
+        avisoFin.textContent = "Aviso de fin";
+        meta.appendChild(avisoFin);
+      }
       cuerpo.appendChild(meta);
     }
 
@@ -153,6 +169,7 @@ async function cargar() {
     });
     estado.completadas = Number(datos.completadas) || 0;
     render();
+    comprobarAvisosFecha();
   } catch (error) {
     mostrarAviso(mensajeError(error, "No se pudieron cargar las misiones."), "error");
   } finally {
@@ -185,6 +202,7 @@ async function completarMision(tipo, mision, elemento, boton) {
 function abrirDialogo() {
   const form = $("#form-mision");
   form.reset();
+  actualizarDisponibilidadAvisos();
   $("#form-error").hidden = true;
   $("#dialogo-tipo").textContent = TIPOS[estado.tipoActivo].nombre.toUpperCase();
   $("#dialogo").showModal();
@@ -222,6 +240,8 @@ async function enviarFormulario(evento) {
       descripcion,
       fecha_inicio: inicio,
       fecha_fin: fin,
+      notificar_inicio: $("#aviso-inicio").checked,
+      notificar_fin: $("#aviso-fin").checked,
     });
     estado.misiones[estado.tipoActivo].push(datos.mision);
     cerrarDialogo();
@@ -234,6 +254,101 @@ async function enviarFormulario(evento) {
     boton.textContent = "Desplegar misión";
   }
 }
+
+/* ---------- Avisos por fecha ---------- */
+function actualizarDisponibilidadAvisos() {
+  const inicio = $("#campo-inicio");
+  const fin = $("#campo-fin");
+  const avisoInicio = $("#aviso-inicio");
+  const avisoFin = $("#aviso-fin");
+  avisoInicio.disabled = !inicio.value;
+  avisoFin.disabled = !fin.value;
+  if (!inicio.value) avisoInicio.checked = false;
+  if (!fin.value) avisoFin.checked = false;
+}
+
+async function activarAvisoFecha(evento) {
+  const control = evento.currentTarget;
+  if (!control.checked) return;
+
+  if (!("Notification" in window)) {
+    control.checked = false;
+    mostrarAviso("Este navegador no permite notificaciones.", "error");
+    return;
+  }
+
+  try {
+    const permiso = Notification.permission === "default"
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    if (permiso !== "granted") {
+      control.checked = false;
+      mostrarAviso("No se concedió permiso para mostrar notificaciones.", "error");
+      return;
+    }
+    mostrarAviso("Aviso activado para esa fecha.");
+  } catch (_) {
+    control.checked = false;
+    mostrarAviso("No se pudo solicitar permiso para las notificaciones.", "error");
+  }
+}
+
+function fechaLocalHoy() {
+  const ahora = new Date();
+  const desfase = ahora.getTimezoneOffset() * 60000;
+  return new Date(ahora.getTime() - desfase).toISOString().slice(0, 10);
+}
+
+async function mostrarNotificacion(titulo, cuerpo, etiqueta) {
+  const opciones = {
+    body: cuerpo,
+    tag: etiqueta,
+    icon: "./iconos/icono-192.png",
+  };
+  if ("serviceWorker" in navigator) {
+    const registro = await navigator.serviceWorker.getRegistration();
+    if (registro && typeof registro.showNotification === "function") {
+      await registro.showNotification(titulo, opciones);
+      return;
+    }
+  }
+  new Notification(titulo, opciones);
+}
+
+async function comprobarAvisosFecha() {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const hoy = fechaLocalHoy();
+  for (const tipo of ORDEN) {
+    for (const mision of estado.misiones[tipo] || []) {
+      for (const extremo of ["inicio", "fin"]) {
+        const fecha = mision[`fecha_${extremo}`];
+        const habilitado = mision[`notificar_${extremo}`];
+        const yaNotificado = mision[`notificado_${extremo}`] === fecha;
+        const clave = `${tipo}:${mision.id}:${extremo}:${fecha}`;
+        if (!habilitado || !fecha || fecha !== hoy || yaNotificado || avisosEmitidosEnSesion.has(clave)) continue;
+        try {
+          await mostrarNotificacion(
+            extremo === "inicio" ? "Comienza una misión" : "Misión para hoy",
+            `${mision.titulo} — ${extremo === "inicio" ? "fecha de inicio" : "fecha de fin"}`,
+            clave
+          );
+          await Almacen.marcarNotificada(tipo, mision.id, extremo, fecha);
+          mision[`notificado_${extremo}`] = fecha;
+          avisosEmitidosEnSesion.add(clave);
+        } catch (error) {
+          avisosEmitidosEnSesion.add(clave);
+          mostrarAviso(mensajeError(error, "No se pudo mostrar el aviso de fecha."), "error");
+        }
+      }
+    }
+  }
+}
+
+setInterval(comprobarAvisosFecha, 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) comprobarAvisosFecha();
+});
+window.addEventListener("focus", comprobarAvisosFecha);
 
 async function descargarCSV(evento) {
   if (evento) evento.preventDefault();
@@ -339,6 +454,13 @@ $("#btn-cerrar").addEventListener("click", cerrarDialogo);
 $("#btn-cancelar").addEventListener("click", cerrarDialogo);
 $("#form-mision").addEventListener("submit", enviarFormulario);
 $("#btn-csv").addEventListener("click", descargarCSV);
+$("#campo-inicio").addEventListener("change", actualizarDisponibilidadAvisos);
+$("#campo-fin").addEventListener("change", actualizarDisponibilidadAvisos);
+$("#aviso-inicio").addEventListener("change", activarAvisoFecha);
+$("#aviso-fin").addEventListener("change", activarAvisoFecha);
+$("#btn-anadir-fase").addEventListener("click", () => {
+  mostrarAviso("La creación de fases estará disponible en una próxima actualización.");
+});
 
 $("#dialogo").addEventListener("click", (evento) => {
   if (evento.target === $("#dialogo")) cerrarDialogo();

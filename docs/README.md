@@ -39,6 +39,9 @@ La app queda con icono propio y, tras la primera visita, funciona sin conexión.
 
 - Las mismas cuatro secciones, alta de misiones, fechas, botón **Completar** y
   contador que la versión web.
+- Avisos opcionales para la fecha de inicio y/o fin. Requieren permiso del
+  navegador; se comprueban mientras la app está abierta. Sin un servicio push,
+  no se pueden garantizar avisos con la app cerrada.
 - **Almacenamiento local** (`localStorage`): no sale nada del dispositivo.
 - **Descargar CSV** generado al momento, con las mismas columnas que la web.
 - **Copia de seguridad** en JSON (exportar/importar) para cambiar de móvil,
@@ -86,9 +89,19 @@ La interfaz es común a las dos versiones. Edita siempre en `comun/` y ejecuta:
 python3 sincronizar.py
 ```
 
-Ese script copia `nucleo.js` y `style.css` a `web/static/` y a `app/`, y
-actualiza la versión de caché de `sw.js` para que los navegadores recojan los
-cambios.
+Ese script copia `nucleo.js` y `style.css` a `web/static/`, `app/` y `docs/`,
+sincroniza el adaptador local de `app/` a `docs/` y actualiza la versión de
+caché de los service workers para que los navegadores recojan los cambios.
+
+### Recibir una actualización
+
+La app móvil/ordenador actual es una PWA, no un APK/instalador descargado. Si
+publicas la nueva versión en la misma URL, la app instalada recoge el cambio al
+volver a abrir o actualizar la página; puede hacer falta cerrar y abrirla una
+vez para que el navegador active el service worker nuevo. Las misiones locales
+se conservan mientras mantengas el mismo sitio/URL y no borres los datos del
+navegador. Cambiar de URL u origen crea un almacenamiento separado; usa la
+copia JSON para trasladar datos.
 
 ## Costes
 

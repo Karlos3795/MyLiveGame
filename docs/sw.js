@@ -5,7 +5,7 @@
 
 "use strict";
 
-const CACHE = "misiones-app-8428b32f";
+const CACHE = "misiones-app-c6879028";
 
 const RECURSOS = [
   "./",
