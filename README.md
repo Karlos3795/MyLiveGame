@@ -101,7 +101,8 @@ firma; están detalladas en [`app/README.md`](app/README.md#costes).
 
 ### Avisos de fecha
 
-El navegador debe tener permiso para mostrar notificaciones. La app comprueba
-las fechas cuando está abierta y avisa ese día; como esta PWA no usa un servidor
-de notificaciones push, no puede garantizar avisos si está cerrada o el
-dispositivo está apagado.
+El navegador debe tener permiso para mostrar notificaciones. La fecha de inicio
+avisa a las **00:00** y la fecha fin a las **23:59**, según la hora local del
+dispositivo. La app comprueba las fechas mientras está abierta y en primer
+plano; como esta PWA no usa un servidor de notificaciones push, no puede
+garantizar avisos si está cerrada o en segundo plano.

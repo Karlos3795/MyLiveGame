@@ -524,21 +524,35 @@ button.btn-csv {
 .fecha-control > input[type="date"] { flex: 1; min-width: 0; }
 
 .opcion-aviso {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-width: 104px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
   color: var(--texto-suave);
   font-size: 11px;
   cursor: pointer;
   user-select: none;
+  touch-action: manipulation;
+  transition: 0.18s ease;
 }
 
 .opcion-aviso input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
+  cursor: pointer;
 }
 
 .radio-aviso {
@@ -564,6 +578,8 @@ button.btn-csv {
 .opcion-aviso input:checked + .radio-aviso::after { background: var(--acento); }
 .opcion-aviso input:focus-visible + .radio-aviso { outline: 2px solid var(--acento); outline-offset: 3px; }
 .opcion-aviso input:disabled ~ span { opacity: 0.4; }
+.opcion-aviso:has(input:checked) { border-color: color-mix(in srgb, var(--acento) 60%, var(--borde)); color: var(--acento); background: var(--acento-tenue); }
+.opcion-aviso:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 2px; }
 .opcion-aviso:has(input:disabled) { cursor: not-allowed; }
 
 .ajustes-avanzados {

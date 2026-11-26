@@ -39,9 +39,10 @@ La app queda con icono propio y, tras la primera visita, funciona sin conexión.
 
 - Las mismas cuatro secciones, alta de misiones, fechas, botón **Completar** y
   contador que la versión web.
-- Avisos opcionales para la fecha de inicio y/o fin. Requieren permiso del
-  navegador; se comprueban mientras la app está abierta. Sin un servicio push,
-  no se pueden garantizar avisos con la app cerrada.
+- Avisos opcionales a las 00:00 para la fecha de inicio y/o a las 23:59 para la
+  fecha fin (hora local). Requieren permiso del navegador; se comprueban mientras
+  la app está abierta y en primer plano. Sin servicio push, no se garantizan con
+  la app cerrada o en segundo plano.
 - **Almacenamiento local** (`localStorage`): no sale nada del dispositivo.
 - **Descargar CSV** generado al momento, con las mismas columnas que la web.
 - **Copia de seguridad** en JSON (exportar/importar) para cambiar de móvil,

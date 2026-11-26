@@ -227,6 +227,7 @@ async function enviarFormulario(evento) {
   };
 
   if (!titulo) return fallo("El título es obligatorio.");
+  if (inicio && inicio < fechaLocalHoy()) return fallo("La fecha inicio no puede ser anterior a hoy.");
   if (inicio && fin && fin < inicio) return fallo("La fecha fin no puede ser anterior a la fecha inicio.");
 
   const boton = $("#form-mision").querySelector('button[type="submit"]');
@@ -240,6 +241,7 @@ async function enviarFormulario(evento) {
       descripcion,
       fecha_inicio: inicio,
       fecha_fin: fin,
+      fecha_hoy_local: fechaLocalHoy(),
       notificar_inicio: $("#aviso-inicio").checked,
       notificar_fin: $("#aviso-fin").checked,
     });
@@ -261,6 +263,8 @@ function actualizarDisponibilidadAvisos() {
   const fin = $("#campo-fin");
   const avisoInicio = $("#aviso-inicio");
   const avisoFin = $("#aviso-fin");
+  inicio.min = fechaLocalHoy();
+  fin.min = inicio.value || "";
   avisoInicio.disabled = !inicio.value;
   avisoFin.disabled = !fin.value;
   if (!inicio.value) avisoInicio.checked = false;
@@ -318,6 +322,7 @@ async function mostrarNotificacion(titulo, cuerpo, etiqueta) {
 async function comprobarAvisosFecha() {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const hoy = fechaLocalHoy();
+  const ahora = new Date();
   for (const tipo of ORDEN) {
     for (const mision of estado.misiones[tipo] || []) {
       for (const extremo of ["inicio", "fin"]) {
@@ -325,7 +330,11 @@ async function comprobarAvisosFecha() {
         const habilitado = mision[`notificar_${extremo}`];
         const yaNotificado = mision[`notificado_${extremo}`] === fecha;
         const clave = `${tipo}:${mision.id}:${extremo}:${fecha}`;
-        if (!habilitado || !fecha || fecha !== hoy || yaNotificado || avisosEmitidosEnSesion.has(clave)) continue;
+        const horaProgramada = extremo === "inicio" ? 0 : 23;
+        const minutoProgramado = extremo === "inicio" ? 0 : 59;
+        const esHoraProgramada = ahora.getHours() === horaProgramada && ahora.getMinutes() === minutoProgramado;
+        if (!habilitado || !fecha || fecha !== hoy || !esHoraProgramada || yaNotificado || avisosEmitidosEnSesion.has(clave)) continue;
+        avisosEmitidosEnSesion.add(clave);
         try {
           await mostrarNotificacion(
             extremo === "inicio" ? "Comienza una misión" : "Misión para hoy",
@@ -334,9 +343,7 @@ async function comprobarAvisosFecha() {
           );
           await Almacen.marcarNotificada(tipo, mision.id, extremo, fecha);
           mision[`notificado_${extremo}`] = fecha;
-          avisosEmitidosEnSesion.add(clave);
         } catch (error) {
-          avisosEmitidosEnSesion.add(clave);
           mostrarAviso(mensajeError(error, "No se pudo mostrar el aviso de fecha."), "error");
         }
       }
@@ -344,7 +351,7 @@ async function comprobarAvisosFecha() {
   }
 }
 
-setInterval(comprobarAvisosFecha, 60 * 1000);
+setInterval(comprobarAvisosFecha, 10 * 1000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) comprobarAvisosFecha();
 });

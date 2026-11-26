@@ -181,12 +181,42 @@ class Handler(BaseHTTPRequestHandler):
             if not titulo:
                 self._error("El titulo es obligatorio")
                 return
+            fecha_inicio = str(datos.get("fecha_inicio", "")).strip()[:10]
+            fecha_fin = str(datos.get("fecha_fin", "")).strip()[:10]
+            fecha_hoy_local = str(datos.get("fecha_hoy_local", "")).strip()[:10]
+            for etiqueta, valor in (("inicio", fecha_inicio), ("fin", fecha_fin)):
+                if valor:
+                    try:
+                        fecha_parseada = datetime.strptime(valor, "%Y-%m-%d")
+                    except ValueError:
+                        self._error(f"La fecha {etiqueta} no es válida")
+                        return
+                    if fecha_parseada.strftime("%Y-%m-%d") != valor:
+                        self._error(f"La fecha {etiqueta} no es válida")
+                        return
+            if fecha_hoy_local:
+                try:
+                    fecha_hoy_parseada = datetime.strptime(fecha_hoy_local, "%Y-%m-%d")
+                except ValueError:
+                    self._error("La fecha local de hoy no es válida")
+                    return
+                if fecha_hoy_parseada.strftime("%Y-%m-%d") != fecha_hoy_local:
+                    self._error("La fecha local de hoy no es válida")
+                    return
+            else:
+                fecha_hoy_local = datetime.now().date().isoformat()
+            if fecha_inicio and fecha_inicio < fecha_hoy_local:
+                self._error("La fecha inicio no puede ser anterior a hoy")
+                return
+            if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
+                self._error("La fecha fin no puede ser anterior a la fecha inicio")
+                return
             mision = {
                 "id": uuid.uuid4().hex[:10],
                 "titulo": titulo[:160],
                 "descripcion": str(datos.get("descripcion", "")).strip()[:1000],
-                "fecha_inicio": str(datos.get("fecha_inicio", "")).strip()[:10],
-                "fecha_fin": str(datos.get("fecha_fin", "")).strip()[:10],
+                "fecha_inicio": fecha_inicio,
+                "fecha_fin": fecha_fin,
                 "notificar_inicio": bool(datos.get("notificar_inicio", False)),
                 "notificar_fin": bool(datos.get("notificar_fin", False)),
                 "notificado_inicio": "",

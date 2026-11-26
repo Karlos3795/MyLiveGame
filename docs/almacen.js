@@ -142,13 +142,23 @@ window.Almacen = {
     if (!titulo) {
       throw new Error("El título es obligatorio.");
     }
+    const fechaInicio = String(datos.fecha_inicio || "").trim().slice(0, 10);
+    const fechaFin = String(datos.fecha_fin || "").trim().slice(0, 10);
+    const ahora = new Date();
+    const hoy = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (fechaInicio && fechaInicio < hoy) {
+      throw new Error("La fecha inicio no puede ser anterior a hoy.");
+    }
+    if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
+      throw new Error("La fecha fin no puede ser anterior a la fecha inicio.");
+    }
     const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
     const mision = {
       id: nuevoId(),
       titulo: titulo.slice(0, 160),
       descripcion: String(datos.descripcion || "").trim().slice(0, 1000),
-      fecha_inicio: String(datos.fecha_inicio || "").trim().slice(0, 10),
-      fecha_fin: String(datos.fecha_fin || "").trim().slice(0, 10),
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
       notificar_inicio: Boolean(datos.notificar_inicio),
       notificar_fin: Boolean(datos.notificar_fin),
       notificado_inicio: "",
