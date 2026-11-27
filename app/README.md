@@ -1,4 +1,4 @@
-# MISIONES — versión app (móvil y ordenador)
+# MyLiveGame (beta 2.0) — versión app (móvil y ordenador)
 
 Aplicación instalable tipo **PWA**: se abre como una app (sin barra del
 navegador), funciona **sin conexión** y guarda todos los datos **en el propio
@@ -14,7 +14,7 @@ python3 app/servir.py
 Se abre <http://127.0.0.1:8080>. En Chrome o Edge:
 
 - Pulsa el botón **Instalar app** de la cabecera, o
-- Menú del navegador → **Instalar MISIONES**.
+- Menú del navegador → **Instalar MyLiveGame**.
 
 Queda como una aplicación de escritorio con su icono y se abre en su propia
 ventana. Al ser `localhost`, el navegador la considera segura y permite la
@@ -45,6 +45,8 @@ La app queda con icono propio y, tras la primera visita, funciona sin conexión.
   pasar datos a otro navegador o recuperarlos.
 - **Sin conexión** gracias al service worker.
 - Iconos, `manifest.webmanifest` y botón de instalación.
+- Historial con filtros, edición/cancelación, progreso ponderado y reactivación
+  de misiones diarias o regulares.
 
 ## Dónde están los datos
 

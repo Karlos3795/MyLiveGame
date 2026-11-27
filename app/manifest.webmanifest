@@ -1,7 +1,7 @@
 {
-  "name": "MISIONES — Registro de campaña",
-  "short_name": "Misiones",
-  "description": "Convierte tus tareas en misiones de videojuego. Funciona sin conexión y guarda todo en tu dispositivo.",
+  "name": "MyLiveGame (beta)",
+  "short_name": "MyLiveGame",
+  "description": "MyLiveGame (beta): convierte tus tareas en misiones de videojuego.",
   "lang": "es",
   "dir": "ltr",
   "id": "./",
@@ -10,8 +10,8 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#080b12",
-  "theme_color": "#080b12",
+  "background_color": "#ff9a5c",
+  "theme_color": "#ff9a5c",
   "categories": ["productivity", "lifestyle"],
   "icons": [
     {

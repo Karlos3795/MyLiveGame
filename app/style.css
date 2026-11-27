@@ -86,11 +86,13 @@ body {
   transition: color 0.3s ease;
 }
 
+.logo-mlg { display: block; width: 44px; height: 44px; flex: 0 0 auto; border-radius: 11px; object-fit: cover; box-shadow: 0 0 20px rgba(255,154,92,.18); }
+
 h1 {
   margin: 0;
   font-family: var(--fuente-mono);
-  font-size: 26px;
-  letter-spacing: 0.34em;
+  font-size: 24px;
+  letter-spacing: 0.08em;
   font-weight: 700;
 }
 
@@ -353,6 +355,8 @@ button.btn-csv {
 .mision-meta .dato::before { content: "▸ "; color: var(--acento); }
 .mision-meta .dato-aviso { color: var(--acento); }
 .mision-meta .dato-aviso::before { content: "◉ "; }
+.mision-meta .dato-recurrente { color: #b6a0ff; }
+.mision-meta .dato-recurrente::before { content: "↻ "; }
 
 .mision-fases { margin-top: 12px; border: 1px solid var(--borde); border-radius: 9px; background: rgba(3, 7, 13, .32); }
 .mision-fases > summary { padding: 9px 11px; color: var(--acento); font: 10px var(--fuente-mono); letter-spacing: .07em; cursor: pointer; list-style: none; }
@@ -372,6 +376,12 @@ button.btn-csv {
 .mision-acciones { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .btn-ajustes-mision { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--borde); border-radius: 9px; background: transparent; color: var(--texto-suave); font-size: 17px; cursor: pointer; touch-action: manipulation; }
 .btn-ajustes-mision:hover { color: var(--acento); border-color: var(--acento); background: var(--acento-tenue); }
+
+.progreso-mision { margin-top: 12px; }
+.progreso-mision-cabecera { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; color: var(--texto-tenue); font: 10px var(--fuente-mono); letter-spacing: .05em; }
+.progreso-mision-cabecera strong { color: var(--acento); }
+.progreso-mision-barra { height: 6px; overflow: hidden; border-radius: 99px; background: #070b12; }
+.progreso-mision-barra span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--acento), #ffe49a); transition: width .3s ease; }
 
 .btn-completar {
   flex-shrink: 0;
@@ -512,7 +522,7 @@ button.btn-csv {
 .campo > span b { color: var(--acento); }
 .campo > span em, .campo-fecha > label em { color: var(--texto-tenue); font-style: normal; text-transform: none; letter-spacing: 0; }
 
-.campo input, .campo textarea {
+.campo input, .campo textarea, .campo select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--borde);
@@ -525,12 +535,14 @@ button.btn-csv {
 }
 
 .campo textarea { resize: vertical; min-height: 70px; }
+.campo select { color-scheme: dark; }
 
 .campo input:focus, .campo textarea:focus {
   outline: none;
   border-color: var(--acento);
   box-shadow: 0 0 0 3px var(--acento-tenue);
 }
+.campo select:focus { outline: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-tenue); }
 
 .campo input::placeholder, .campo textarea::placeholder { color: #46546a; }
 
@@ -541,6 +553,9 @@ button.btn-csv {
 .campo-fecha > label { cursor: pointer; }
 .fecha-control { display: flex; align-items: center; gap: 10px; }
 .fecha-control > input[type="date"] { flex: 1; min-width: 0; }
+.hora-aviso-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -5px 0 12px; color: var(--texto-tenue); font-size: 11px; }
+.hora-aviso-control input { width: 112px; padding: 6px 8px; border: 1px solid var(--borde); border-radius: 7px; background: #0a0f18; color: var(--texto); color-scheme: dark; font: 12px var(--fuente-mono); }
+.hora-aviso-control input:disabled { opacity: .35; }
 
 .opcion-aviso {
   position: relative;
@@ -697,10 +712,31 @@ button.btn-csv {
 .ajuste-fase-opciones { margin-bottom: 12px; }
 .opcion-check { display: flex; align-items: center; gap: 8px; min-height: 40px; color: var(--texto-suave); font-size: 12px; }
 .opcion-check input { accent-color: var(--acento); width: 18px; height: 18px; }
+.opcion-regular { margin: 4px 0 10px; }
+.regular-opciones { padding: 12px; margin: 0 0 14px; border: 1px solid var(--borde); border-radius: 10px; background: rgba(0,0,0,.18); }
+.regular-titulo { margin: 0 0 8px; color: var(--texto-suave); font: 10px var(--fuente-mono); letter-spacing: .12em; text-transform: uppercase; }
+.dias-regular { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.dias-regular label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 40px; min-height: 40px; padding: 6px 8px; border: 1px solid var(--borde); border-radius: 9px; color: var(--texto-suave); font: 11px var(--fuente-mono); cursor: pointer; }
+.dias-regular label:has(input:checked) { border-color: var(--acento); color: var(--acento); background: var(--acento-tenue); }
+.dias-regular input { accent-color: var(--acento); }
+.btn-peligro { padding: 10px 13px; border: 1px solid rgba(255,107,107,.55); border-radius: 9px; background: rgba(255,107,107,.1); color: var(--peligro); font: 10px var(--fuente-mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.btn-peligro:hover { background: var(--peligro); color: #080b12; }
 .dialogo-ajuste-fase input[type="date"], .dialogo-grado select { color-scheme: dark; }
 .dialogo-grado { width: min(460px, calc(100% - 28px)); }
 .dialogo-grado select { width: 100%; padding: 11px 12px; border: 1px solid var(--borde); border-radius: 9px; background: #0a0f18; color: var(--texto); font: inherit; }
 .dialogo-grado select:focus { outline: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-tenue); }
+
+.dialogo-historial { width: min(920px, calc(100% - 24px)); }
+.panel-historial { padding: 22px; }
+.filtros-historial { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(120px, 1fr)); gap: 12px; padding: 14px 0; border-bottom: 1px dashed var(--borde); }
+.filtros-historial .campo { margin: 0; }
+.historial-resumen { margin: 12px 0 8px; color: var(--texto-tenue); font: 10px var(--fuente-mono); letter-spacing: .08em; text-transform: uppercase; }
+.lista-historial { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.historial-item { padding: 13px 15px; border: 1px solid var(--borde); border-left: 3px solid var(--acento); border-radius: 9px; background: var(--panel-alto); }
+.historial-item-cuerpo strong { font-size: 14px; }
+.historial-item-cuerpo p { margin: 4px 0; color: var(--texto-suave); font-size: 12px; white-space: pre-wrap; }
+.historial-item-cuerpo small { color: var(--texto-tenue); font: 10px var(--fuente-mono); }
+.historial-vacio { padding: 28px 10px; }
 
 /* ---------- Aviso ---------- */
 .aviso {
@@ -726,7 +762,7 @@ button.btn-csv {
 
 @media (max-width: 640px) {
   .hud { padding-top: 22px; }
-  h1 { font-size: 21px; letter-spacing: 0.24em; }
+  h1 { font-size: 19px; letter-spacing: 0.04em; }
   .hud-derecha { width: 100%; justify-content: space-between; }
   .hud-acciones { justify-content: flex-start; }
   .panel { padding: 18px; min-height: 320px; }
@@ -747,5 +783,8 @@ button.btn-csv {
   .dialogo-ajuste-fase .dialogo-pie, .dialogo-grado .dialogo-pie { flex-wrap: wrap; }
   .dialogo-ajuste-fase .dialogo-pie button { flex: 1 1 40%; }
   #btn-eliminar-fase { flex-basis: 100% !important; }
+  .filtros-historial { grid-template-columns: 1fr 1fr; }
+  .filtros-historial .campo:first-child { grid-column: 1 / -1; }
+  .panel-historial { padding: 16px; }
   .pie { font-size: 10.5px; }
 }

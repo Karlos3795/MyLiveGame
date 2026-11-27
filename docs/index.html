@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>MISIONES — Registro de campaña</title>
-  <meta name="description" content="Convierte tus tareas en misiones de videojuego. Funciona sin conexión y guarda todo en tu dispositivo.">
-  <meta name="theme-color" content="#080b12">
+  <title>MyLiveGame (beta)</title>
+  <meta name="description" content="MyLiveGame (beta): convierte tus tareas en misiones.">
+  <meta name="theme-color" content="#ff9a5c">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Misiones">
+  <meta name="apple-mobile-web-app-title" content="MyLiveGame">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="64x64" href="iconos/favicon-64.png">
   <link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
@@ -21,10 +21,10 @@
 
   <header class="hud">
     <div class="marca">
-      <span class="sigilo" aria-hidden="true">◆</span>
+      <img class="logo-mlg" src="iconos/favicon-64.png" alt="">
       <div>
-        <h1>MISIONES</h1>
-        <p class="lema-app">Registro de campaña personal · app</p>
+        <h1>MyLiveGame</h1>
+        <p class="lema-app">Tu campaña personal · beta 2.0</p>
       </div>
     </div>
     <div class="hud-derecha">
@@ -35,6 +35,7 @@
       <div class="hud-acciones">
         <button type="button" class="btn-csv" id="btn-instalar">Instalar app</button>
         <button type="button" class="btn-csv" id="btn-copia">Copia de seguridad</button>
+        <button type="button" class="btn-csv" id="btn-historial">Historial</button>
         <button type="button" class="btn-csv" id="btn-csv">Descargar CSV</button>
       </div>
     </div>
@@ -94,7 +95,7 @@
       <header class="dialogo-cabecera">
         <div>
           <p class="dialogo-etiqueta" id="dialogo-tipo">PRINCIPALES</p>
-          <h3>Nueva misión</h3>
+          <h3 id="dialogo-titulo">Nueva misión</h3>
         </div>
         <button type="button" class="btn-cerrar" id="btn-cerrar" aria-label="Cerrar">×</button>
       </header>
@@ -118,9 +119,10 @@
             <label class="opcion-aviso" for="aviso-inicio">
               <input type="checkbox" id="aviso-inicio" disabled>
               <span class="radio-aviso" aria-hidden="true"></span>
-              <span>Avisarme · 00:00</span>
+              <span>Avisarme</span>
             </label>
           </div>
+          <label class="hora-aviso-control" for="campo-hora-inicio">Hora del aviso <input type="time" id="campo-hora-inicio" value="00:00" disabled></label>
         </div>
         <div class="campo campo-fecha">
           <label for="campo-fin">Fecha fin <em>(opcional)</em></label>
@@ -129,16 +131,35 @@
             <label class="opcion-aviso" for="aviso-fin">
               <input type="checkbox" id="aviso-fin" disabled>
               <span class="radio-aviso" aria-hidden="true"></span>
-              <span>Avisarme · 23:59</span>
+              <span>Avisarme</span>
             </label>
           </div>
+          <label class="hora-aviso-control" for="campo-hora-fin">Hora del aviso <input type="time" id="campo-hora-fin" value="23:59" disabled></label>
         </div>
       </div>
+
+      <label class="campo"><span>Tipo de misión</span>
+        <select id="campo-tipo">
+          <option value="principales">Principales</option>
+          <option value="secundarias">Secundarias</option>
+          <option value="campo">De Campo</option>
+          <option value="diarias">Diarias</option>
+        </select>
+      </label>
 
       <details class="ajustes-avanzados">
         <summary><span>Ajustes avanzados</span><span class="chevron" aria-hidden="true">⌄</span></summary>
         <div class="avanzados-contenido">
           <p>Opciones adicionales para personalizar esta misión.</p>
+          <label class="opcion-check opcion-regular"><input type="checkbox" id="campo-regular"> Activar misión regular</label>
+          <div class="regular-opciones" id="regular-opciones" hidden>
+            <p class="regular-titulo">Días de reactivación</p>
+            <div class="dias-regular" role="group" aria-label="Días de reactivación">
+              <label><input type="checkbox" class="dia-regular" value="1"> L</label><label><input type="checkbox" class="dia-regular" value="2"> M</label><label><input type="checkbox" class="dia-regular" value="3"> X</label><label><input type="checkbox" class="dia-regular" value="4"> J</label><label><input type="checkbox" class="dia-regular" value="5"> V</label><label><input type="checkbox" class="dia-regular" value="6"> S</label><label><input type="checkbox" class="dia-regular" value="0"> D</label>
+            </div>
+            <label class="campo"><span>Hora del aviso semanal <em>(opcional)</em></span><input type="time" id="campo-hora-regular"></label>
+            <label class="opcion-check"><input type="checkbox" id="campo-aviso-regular"> Enviar notificación a esa hora</label>
+          </div>
           <button type="button" class="btn-fase" id="btn-anadir-fase">＋ Añadir fases</button>
         </div>
       </details>
@@ -146,10 +167,25 @@
       <p class="form-error" id="form-error" role="alert" hidden></p>
 
       <footer class="dialogo-pie">
+        <button type="button" class="btn-peligro" id="btn-cancelar-mision" hidden>Cancelar misión</button>
         <button type="button" class="btn-secundario" id="btn-cancelar">Cancelar</button>
-        <button type="submit" class="btn-primario">Desplegar misión</button>
+        <button type="submit" class="btn-primario" id="btn-guardar-mision">Desplegar misión</button>
       </footer>
     </form>
+  </dialog>
+
+  <dialog id="dialogo-historial" class="dialogo dialogo-historial">
+    <section class="panel-historial">
+      <header class="dialogo-cabecera"><div><p class="dialogo-etiqueta">ARCHIVO DE CAMPAÑA</p><h3>Historial de misiones</h3></div><button type="button" class="btn-cerrar" id="btn-cerrar-historial" aria-label="Cerrar historial">×</button></header>
+      <div class="filtros-historial">
+        <label class="campo"><span>Buscar por título</span><input type="search" id="historial-busqueda" placeholder="Escribe para buscar…"></label>
+        <label class="campo"><span>Tipo</span><select id="historial-tipo"><option value="">Todos</option><option value="principales">Principales</option><option value="secundarias">Secundarias</option><option value="campo">De Campo</option><option value="diarias">Diarias</option></select></label>
+        <label class="campo"><span>Desde</span><input type="date" id="historial-desde"></label>
+        <label class="campo"><span>Hasta</span><input type="date" id="historial-hasta"></label>
+      </div>
+      <p class="historial-resumen" id="historial-resumen"></p><ul class="lista-historial" id="lista-historial"></ul>
+      <div class="vacio historial-vacio" id="historial-vacio" hidden><p class="vacio-titulo">No hay resultados</p><p class="vacio-texto">Prueba a cambiar los filtros.</p></div>
+    </section>
   </dialog>
 
   <dialog id="dialogo-editor-fases" class="dialogo dialogo-editor">
@@ -198,6 +234,7 @@
         <label class="opcion-check"><input type="checkbox" id="ajuste-fase-aviso-inicio"> Avisarme al inicio · 00:00</label>
         <label class="opcion-check"><input type="checkbox" id="ajuste-fase-aviso-fin"> Avisarme al fin · 23:59</label>
       </div>
+      <div class="campos-fila"><label class="campo"><span>Hora aviso inicio</span><input type="time" id="ajuste-fase-hora-inicio" value="00:00"></label><label class="campo"><span>Hora aviso fin</span><input type="time" id="ajuste-fase-hora-fin" value="23:59"></label></div>
       <label class="campo"><span>Peso / valor de la fase</span><input type="number" id="ajuste-fase-valor" min="0" step="0.1" value="1"></label>
       <p class="form-error" id="ajuste-fase-error" role="alert" hidden></p>
       <footer class="dialogo-pie">

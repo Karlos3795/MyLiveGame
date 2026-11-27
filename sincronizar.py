@@ -6,8 +6,8 @@ Flujo de desarrollo:
   2. Ejecuta `python3 sincronizar.py`.
   3. Prueba `web/` y `app/` (y publica `docs/` si corresponde).
 
-Así la versión web y la app mantienen la misma interfaz. Cada versión solo
-se diferencia en su `index.html` y en su `almacen.js` (servidor o local).
+Así la versión web y la app mantienen la misma interfaz. La carpeta `docs/`
+recibe una copia completa de la PWA para su publicación pública.
 """
 
 import hashlib
@@ -46,8 +46,8 @@ def actualizar_cache_sw(huella):
         with open(ruta, "r", encoding="utf-8") as f:
             codigo = f.read()
         nuevo, cambios = re.subn(
-            r'const CACHE = "misiones-app-[^"]*";',
-            'const CACHE = "misiones-app-%s";' % huella,
+            r'const CACHE = "mylivegame-app-[^"]*";',
+            'const CACHE = "mylivegame-app-%s";' % huella,
             codigo,
         )
         if cambios and nuevo != codigo:
@@ -75,19 +75,34 @@ def main():
             else:
                 print("Sin cambios", os.path.relpath(ruta, BASE))
 
-    # docs/ publica la PWA de móvil y ordenador, con HTML propio, pero usa el
-    # mismo adaptador local que app/.
-    adaptador = os.path.join(BASE, "app", "almacen.js")
-    docs_adaptador = os.path.join(BASE, "docs", "almacen.js")
-    if os.path.exists(adaptador) and escribir_si_cambia(docs_adaptador, leer(adaptador)):
-        print("Actualizado", os.path.relpath(docs_adaptador, BASE))
+    # docs/ es la publicación de GitHub Pages; sincroniza el paquete completo.
+    archivos_app = ("index.html", "almacen.js", "manifest.webmanifest", "sw.js")
+    for nombre in archivos_app:
+        origen = os.path.join(BASE, "app", nombre)
+        destino = os.path.join(BASE, "docs", nombre)
+        if escribir_si_cambia(destino, leer(origen)):
+            print("Actualizado", os.path.relpath(destino, BASE))
+
+    iconos = (
+        "icono-192.png", "icono-512.png", "icono-maskable-512.png",
+        "apple-touch-icon.png", "favicon-64.png",
+    )
+    destino_iconos = os.path.join(BASE, "docs", "iconos")
+    os.makedirs(destino_iconos, exist_ok=True)
+    for nombre in iconos:
+        origen = os.path.join(BASE, "app", "iconos", nombre)
+        destino = os.path.join(destino_iconos, nombre)
+        if escribir_si_cambia(destino, leer(origen)):
+            print("Actualizado", os.path.relpath(destino, BASE))
+    web_favicon = os.path.join(BASE, "web", "static", "favicon-64.png")
+    icono_favicon = os.path.join(BASE, "app", "iconos", "favicon-64.png")
+    if escribir_si_cambia(web_favicon, leer(icono_favicon)):
+        print("Actualizado", os.path.relpath(web_favicon, BASE))
 
     # La caché del service worker cambia cuando cambia la interfaz.
-    # docs/ es la versión PWA que se publica; lleva un HTML propio, pero comparte
-    # adaptador, núcleo y estilos con app/.
     for extra in (
         "app/index.html", "app/almacen.js", "app/manifest.webmanifest",
-        "docs/index.html", "docs/almacen.js", "docs/manifest.webmanifest",
+        *[os.path.join("app", "iconos", nombre) for nombre in iconos],
     ):
         ruta = os.path.join(BASE, extra)
         if os.path.exists(ruta):
@@ -95,7 +110,7 @@ def main():
     huella = hash_total.hexdigest()[:8]
     actualizados = actualizar_cache_sw(huella)
     if actualizados:
-        print("Caché PWA actualizada (%s): misiones-app-%s" % (", ".join(actualizados), huella))
+        print("Caché PWA actualizada (%s): mylivegame-app-%s" % (", ".join(actualizados), huella))
 
     print("\nListo. Recuerda probar las dos versiones.")
     return 0

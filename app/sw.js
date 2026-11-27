@@ -1,11 +1,11 @@
-/* Service worker de MISIONES (versión app).
+/* Service worker de MyLiveGame (beta).
  * Guarda la interfaz en caché para que funcione sin conexión.
  * IMPORTANTE: sube el número de CACHE al publicar cambios.
  */
 
 "use strict";
 
-const CACHE = "misiones-app-2d8ffb4a";
+const CACHE = "mylivegame-app-2376d4ff";
 
 const RECURSOS = [
   "./",

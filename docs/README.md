@@ -1,4 +1,4 @@
-# MISIONES — versión app (móvil y ordenador)
+# MyLiveGame (beta 2.0) — versión app (móvil y ordenador)
 
 Aplicación instalable tipo **PWA**: se abre como una app (sin barra del
 navegador), funciona **sin conexión** y guarda todos los datos **en el propio
@@ -14,7 +14,7 @@ python3 app/servir.py
 Se abre <http://127.0.0.1:8080>. En Chrome o Edge:
 
 - Pulsa el botón **Instalar app** de la cabecera, o
-- Menú del navegador → **Instalar MISIONES**.
+- Menú del navegador → **Instalar MyLiveGame**.
 
 Queda como una aplicación de escritorio con su icono y se abre en su propia
 ventana. Al ser `localhost`, el navegador la considera segura y permite la
@@ -39,14 +39,16 @@ La app queda con icono propio y, tras la primera visita, funciona sin conexión.
 
 - Las mismas cuatro secciones, alta de misiones, fechas, botón **Completar** y
   contador que la versión web.
-- Avisos opcionales a las 00:00 para la fecha de inicio y/o a las 23:59 para la
-  fecha fin (hora local). Requieren permiso del navegador; se comprueban mientras
+- Avisos con hora configurable para inicio/fin y recordatorios semanales (por defecto 00:00
+  y 23:59, hora local). Requieren permiso del navegador; se comprueban mientras
   la app está abierta y en primer plano. Sin servicio push, no se garantizan con
   la app cerrada o en segundo plano.
 - Editor de fases con flechas de dependencia, peso/valor y desbloqueo por
   predecesoras completadas; permite ramas y uniones. Las misiones con fases solo
   se pueden completar cuando todas las fases estén terminadas.
 - Cambio de categoría de una misión desde el botón de ajustes.
+- Historial con filtros, edición/cancelación, progreso ponderado y reactivación
+  de misiones diarias o regulares.
 - **Almacenamiento local** (`localStorage`): no sale nada del dispositivo.
 - **Descargar CSV** generado al momento, con las mismas columnas que la web.
 - **Copia de seguridad** en JSON (exportar/importar) para cambiar de móvil,

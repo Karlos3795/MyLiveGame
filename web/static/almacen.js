@@ -35,10 +35,10 @@ window.Almacen = {
     });
   },
 
-  completar(tipo, id) {
+  completar(tipo, id, fechaHoyLocal = "") {
     return pedir("/api/misiones/completar", {
       method: "POST",
-      body: JSON.stringify({ tipo, id }),
+      body: JSON.stringify({ tipo, id, fecha_hoy_local: fechaHoyLocal }),
     });
   },
 
@@ -60,6 +60,20 @@ window.Almacen = {
     return pedir("/api/misiones/cambiar-tipo", {
       method: "POST",
       body: JSON.stringify({ tipo_origen: tipoOrigen, id, tipo_destino: tipoDestino }),
+    });
+  },
+
+  actualizar(tipoOrigen, id, datos) {
+    return pedir("/api/misiones/editar", {
+      method: "POST",
+      body: JSON.stringify({ ...datos, tipo_origen: tipoOrigen, id }),
+    });
+  },
+
+  cancelar(tipo, id) {
+    return pedir("/api/misiones/cancelar", {
+      method: "POST",
+      body: JSON.stringify({ tipo, id }),
     });
   },
 

@@ -1,84 +1,63 @@
 #!/usr/bin/env python3
-"""Genera los iconos PNG de la app a partir de un dibujo vectorial sencillo.
-
-Solo hace falta ejecutarlo si quieres cambiar el diseño:
-    python3 generar_iconos.py
-
-Requiere Pillow (solo para desarrollo; la app no lo necesita).
-"""
+"""Genera los iconos MLG de MyLiveGame (beta) con Pillow."""
 
 import os
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-FONDO = (14, 20, 32, 255)
-FONDO_INTERIOR = (10, 15, 24, 255)
-REJILLA = (40, 56, 80, 70)
-ORO = (242, 193, 78, 255)
+FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 
-def _rombo(dibujo, centro, radio, relleno):
-    x, y = centro
-    dibujo.polygon(
-        [(x, y - radio), (x + radio, y), (x, y + radio), (x - radio, y)],
-        fill=relleno,
-    )
+def mezclar(a, b, t):
+    return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
 
 
 def crear_icono(tam, maskable=False):
-    img = Image.new("RGBA", (tam, tam), (0, 0, 0, 0))
+    escala = 3
+    lado = tam * escala
+    img = Image.new("RGBA", (lado, lado))
+    pixel = img.load()
+    paradas = [
+        (0.0, (255, 119, 88)),
+        (0.42, (255, 181, 91)),
+        (0.68, (255, 211, 117)),
+        (1.0, (145, 83, 106)),
+    ]
+    for y in range(lado):
+        t = y / max(1, lado - 1)
+        for (t0, c0), (t1, c1) in zip(paradas, paradas[1:]):
+            if t0 <= t <= t1:
+                color = mezclar(c0, c1, (t - t0) / (t1 - t0))
+                break
+        for x in range(lado):
+            pixel[x, y] = (*color, 255)
+
     dibujo = ImageDraw.Draw(img)
+    # Disco solar y líneas de horizonte, detrás de las letras negras.
+    sol = int(lado * 0.28)
+    cx, cy = lado // 2, int(lado * 0.36)
+    dibujo.ellipse((cx - sol, cy - sol, cx + sol, cy + sol), fill=(255, 224, 142, 210))
+    horizonte = int(lado * 0.62)
+    for i, grosor in enumerate((5, 3, 2, 1)):
+        yy = horizonte + i * int(lado * 0.035)
+        dibujo.line((int(lado * 0.08), yy, int(lado * 0.92), yy), fill=(142, 76, 91, 145), width=grosor * escala)
 
-    if maskable:
-        dibujo.rectangle([0, 0, tam, tam], fill=FONDO)
-    else:
-        dibujo.rounded_rectangle(
-            [0, 0, tam - 1, tam - 1], radius=int(tam * 0.22), fill=FONDO
-        )
+    fuente = ImageFont.truetype(FUENTE, int(lado * 0.42))
+    texto = "MLG"
+    caja = dibujo.textbbox((0, 0), texto, font=fuente, stroke_width=0)
+    while caja[2] - caja[0] > lado * 0.88:
+        fuente = ImageFont.truetype(FUENTE, int(fuente.size * 0.96))
+        caja = dibujo.textbbox((0, 0), texto, font=fuente)
+    x = (lado - (caja[2] - caja[0])) // 2 - caja[0]
+    y = (lado - (caja[3] - caja[1])) // 2 - caja[1]
+    dibujo.text((x, y), texto, font=fuente, fill=(12, 12, 16, 255), stroke_width=max(1, escala), stroke_fill=(12, 12, 16, 255))
 
-    # Rejilla de fondo, recortada a la forma del icono.
-    rejilla = Image.new("RGBA", (tam, tam), (0, 0, 0, 0))
-    rd = ImageDraw.Draw(rejilla)
-    paso = max(6, tam // 12)
-    grosor = max(1, tam // 256)
-    for pos in range(0, tam + paso, paso):
-        rd.line([(pos, 0), (pos, tam)], fill=REJILLA, width=grosor)
-        rd.line([(0, pos), (tam, pos)], fill=REJILLA, width=grosor)
-
-    if maskable:
-        img.alpha_composite(rejilla)
-    else:
+    img = img.resize((tam, tam), Image.Resampling.LANCZOS)
+    if not maskable:
         mascara = Image.new("L", (tam, tam), 0)
-        ImageDraw.Draw(mascara).rounded_rectangle(
-            [0, 0, tam - 1, tam - 1], radius=int(tam * 0.22), fill=255
-        )
-        img.alpha_composite(Image.composite(rejilla, Image.new("RGBA", (tam, tam)), mascara))
-
-    centro = (tam / 2, tam / 2)
-
-    # Halo.
-    halo = Image.new("RGBA", (tam, tam), (0, 0, 0, 0))
-    _rombo(ImageDraw.Draw(halo), centro, tam * 0.31, (242, 193, 78, 190))
-    halo = halo.filter(ImageFilter.GaussianBlur(tam * 0.055))
-    img.alpha_composite(halo)
-
-    # Rombo exterior, interior y núcleo.
-    dibujo = ImageDraw.Draw(img)
-    _rombo(dibujo, centro, tam * 0.27, ORO)
-    _rombo(dibujo, centro, tam * 0.185, FONDO_INTERIOR)
-    _rombo(dibujo, centro, tam * 0.085, ORO)
-
-    # Marcas en las esquinas.
-    marca = tam * 0.055
-    margen = tam * 0.17
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            x = tam / 2 + sx * (tam / 2 - margen)
-            y = tam / 2 + sy * (tam / 2 - margen)
-            dibujo.line([(x - marca / 2, y), (x + marca / 2, y)], fill=ORO, width=grosor * 2)
-            dibujo.line([(x, y - marca / 2), (x, y + marca / 2)], fill=ORO, width=grosor * 2)
-
+        ImageDraw.Draw(mascara).rounded_rectangle((0, 0, tam - 1, tam - 1), radius=int(tam * 0.22), fill=255)
+        img.putalpha(mascara)
     return img
 
 

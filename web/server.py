@@ -6,8 +6,10 @@ Sirve la interfaz web y guarda las misiones completadas en un CSV.
 """
 
 import csv
+import copy
 import json
 import os
+import re
 import threading
 import uuid
 from datetime import datetime
@@ -19,6 +21,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MISIONES_JSON = os.path.join(DATA_DIR, "misiones.json")
 CSV_PATH = os.path.join(DATA_DIR, "misiones_completadas.csv")
+HISTORIAL_PATH = os.path.join(DATA_DIR, "historial.json")
 
 TIPOS = ("principales", "secundarias", "campo", "diarias")
 MAX_FASES = 100
@@ -80,11 +83,48 @@ def añadir_al_csv(mision):
 
 
 def contar_completadas():
-    if not os.path.exists(CSV_PATH):
-        return 0
+    return len(cargar_historial())
+
+
+def cargar_historial():
+    if not os.path.exists(HISTORIAL_PATH):
+        historial = []
+        if os.path.exists(CSV_PATH):
+            with open(CSV_PATH, "r", encoding="utf-8-sig", newline="") as f:
+                for fila in csv.DictReader(f):
+                    historial.append({
+                        "titulo": fila.get("titulo", ""),
+                        "descripcion": fila.get("descripcion", ""),
+                        "fecha_inicio": fila.get("fecha_inicio", ""),
+                        "fecha_fin": fila.get("fecha_fin", ""),
+                        "fecha_completada": fila.get("fecha_completada", ""),
+                        "tipo": "",  # las filas antiguas no tenían este dato
+                    })
+        guardar_historial(historial)
+        return historial
     with _lock:
-        with open(CSV_PATH, "r", encoding="utf-8", newline="") as f:
-            return max(0, sum(1 for _ in csv.reader(f)) - 1)
+        with open(HISTORIAL_PATH, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+    return datos if isinstance(datos, list) else []
+
+
+def guardar_historial(historial):
+    with _lock:
+        tmp = HISTORIAL_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(historial, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, HISTORIAL_PATH)
+
+
+def registrar_completada(mision, tipo):
+    historial = cargar_historial()
+    registro = copy.deepcopy(mision)
+    registro["tipo"] = tipo
+    registro["fecha_completada"] = datetime.now().isoformat(timespec="seconds")
+    añadir_al_csv(registro)
+    historial.append(registro)
+    guardar_historial(historial)
+    return registro, len(historial)
 
 
 def validar_fecha(valor, etiqueta, hoy):
@@ -101,13 +141,61 @@ def validar_fecha(valor, etiqueta, hoy):
     return valor
 
 
-def normalizar_fases(fases, hoy):
+def validar_hora(valor, etiqueta, por_defecto):
+    hora = str(valor or por_defecto).strip()
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", hora):
+        raise ValueError(f"La hora {etiqueta} no es válida")
+    return hora
+
+
+def validar_campos_mision(datos, hoy, fecha_inicio_anterior=""):
+    titulo = str(datos.get("titulo", "")).strip()[:160]
+    if not titulo:
+        raise ValueError("El título es obligatorio")
+    inicio = str(datos.get("fecha_inicio", "")).strip()[:10]
+    limite_inicio = fecha_inicio_anterior if inicio and inicio == fecha_inicio_anterior else hoy
+    inicio = validar_fecha(inicio, "de inicio", limite_inicio)
+    fin = validar_fecha(str(datos.get("fecha_fin", "")).strip()[:10], "de fin", hoy)
+    if inicio and fin and fin < inicio:
+        raise ValueError("La fecha fin no puede ser anterior a la fecha inicio")
+    hora_inicio = validar_hora(datos.get("hora_aviso_inicio"), "del aviso de inicio", "00:00")
+    hora_fin = validar_hora(datos.get("hora_aviso_fin"), "del aviso de fin", "23:59")
+    if inicio and fin and inicio == fin and hora_fin <= hora_inicio:
+        raise ValueError("Si inicio y fin coinciden, la hora fin debe ser posterior a la hora inicio")
+    dias = datos.get("dias_regular", [])
+    if not isinstance(dias, list):
+        raise ValueError("Los días de recurrencia no son válidos")
+    dias = sorted({int(dia) for dia in dias if str(dia).isdigit() and 0 <= int(dia) <= 6})
+    regular = bool(datos.get("regular", False))
+    if regular and not dias:
+        raise ValueError("Selecciona al menos un día para la misión regular")
+    hora_regular = str(datos.get("hora_regular", "")).strip()
+    if hora_regular:
+        hora_regular = validar_hora(hora_regular, "de reactivación", "00:00")
+    return {
+        "titulo": titulo,
+        "descripcion": str(datos.get("descripcion", "")).strip()[:1000],
+        "fecha_inicio": inicio,
+        "fecha_fin": fin,
+        "notificar_inicio": bool(datos.get("notificar_inicio", False)),
+        "notificar_fin": bool(datos.get("notificar_fin", False)),
+        "hora_aviso_inicio": hora_inicio,
+        "hora_aviso_fin": hora_fin,
+        "regular": regular,
+        "dias_regular": dias,
+        "hora_regular": hora_regular,
+        "notificar_regular": bool(datos.get("notificar_regular", False)) and bool(hora_regular),
+    }
+
+
+def normalizar_fases(fases, hoy, fases_anteriores=None):
     if fases is None:
         return []
     if not isinstance(fases, list) or len(fases) > MAX_FASES:
         raise ValueError(f"La misión admite hasta {MAX_FASES} fases")
     resultado = []
     ids = set()
+    fechas_anteriores = {fase.get("id"): fase.get("fecha_inicio", "") for fase in (fases_anteriores or [])}
     for indice, fase in enumerate(fases):
         if not isinstance(fase, dict):
             raise ValueError("Los datos de una fase no son válidos")
@@ -118,10 +206,16 @@ def normalizar_fases(fases, hoy):
         titulo = str(fase.get("titulo", "")).strip()[:160]
         if not titulo:
             raise ValueError(f"La fase {indice + 1} necesita un título")
-        inicio = validar_fecha(str(fase.get("fecha_inicio", "")).strip()[:10], "de inicio", hoy)
+        inicio = str(fase.get("fecha_inicio", "")).strip()[:10]
+        limite_inicio = fechas_anteriores.get(fid, hoy) if inicio and inicio == fechas_anteriores.get(fid) else hoy
+        inicio = validar_fecha(inicio, "de inicio", limite_inicio)
         fin = validar_fecha(str(fase.get("fecha_fin", "")).strip()[:10], "de fin", hoy)
         if inicio and fin and fin < inicio:
             raise ValueError(f"La fecha fin de «{titulo}» no puede ser anterior a su inicio")
+        hora_inicio = validar_hora(fase.get("hora_aviso_inicio"), "del aviso de inicio", "00:00")
+        hora_fin = validar_hora(fase.get("hora_aviso_fin"), "del aviso de fin", "23:59")
+        if inicio and fin and inicio == fin and hora_fin <= hora_inicio:
+            raise ValueError(f"La hora fin de «{titulo}» debe ser posterior a su hora de inicio")
         try:
             valor = float(fase.get("valor", 1))
         except (TypeError, ValueError) as error:
@@ -136,6 +230,8 @@ def normalizar_fases(fases, hoy):
             "fecha_fin": fin,
             "notificar_inicio": bool(fase.get("notificar_inicio", False)),
             "notificar_fin": bool(fase.get("notificar_fin", False)),
+            "hora_aviso_inicio": hora_inicio,
+            "hora_aviso_fin": hora_fin,
             "notificado_inicio": "",
             "notificado_fin": "",
             "valor": valor,
@@ -184,7 +280,7 @@ def normalizar_dependencias(dependencias, fases):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Misiones/1.0"
+    server_version = "MyLiveGame/2.0-beta"
 
     # ---------- utilidades ----------
     def _json(self, payload, status=200):
@@ -239,13 +335,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         ruta = urlparse(self.path).path
         if ruta == "/api/misiones":
+            historial = cargar_historial()
             self._json(
                 {
                     "ok": True,
                     "misiones": cargar_misiones(),
-                    "completadas": contar_completadas(),
+                    "completadas": len(historial),
+                    "historial": historial,
                 }
             )
+            return
+        if ruta == "/api/historial":
+            self._json({"ok": True, "historial": cargar_historial()})
             return
         if ruta == "/api/csv":
             if not os.path.exists(CSV_PATH):
@@ -271,26 +372,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if ruta == "/api/misiones":
             tipo = str(datos.get("tipo", "")).strip()
-            titulo = str(datos.get("titulo", "")).strip()
             if tipo not in TIPOS:
                 self._error("Tipo de mision no valido")
                 return
-            if not titulo:
-                self._error("El titulo es obligatorio")
-                return
-            fecha_inicio = str(datos.get("fecha_inicio", "")).strip()[:10]
-            fecha_fin = str(datos.get("fecha_fin", "")).strip()[:10]
             fecha_hoy_local = str(datos.get("fecha_hoy_local", "")).strip()[:10]
-            for etiqueta, valor in (("inicio", fecha_inicio), ("fin", fecha_fin)):
-                if valor:
-                    try:
-                        fecha_parseada = datetime.strptime(valor, "%Y-%m-%d")
-                    except ValueError:
-                        self._error(f"La fecha {etiqueta} no es válida")
-                        return
-                    if fecha_parseada.strftime("%Y-%m-%d") != valor:
-                        self._error(f"La fecha {etiqueta} no es válida")
-                        return
             if fecha_hoy_local:
                 try:
                     fecha_hoy_parseada = datetime.strptime(fecha_hoy_local, "%Y-%m-%d")
@@ -302,13 +387,8 @@ class Handler(BaseHTTPRequestHandler):
                     return
             else:
                 fecha_hoy_local = datetime.now().date().isoformat()
-            if fecha_inicio and fecha_inicio < fecha_hoy_local:
-                self._error("La fecha inicio no puede ser anterior a hoy")
-                return
-            if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
-                self._error("La fecha fin no puede ser anterior a la fecha inicio")
-                return
             try:
+                campos = validar_campos_mision(datos, fecha_hoy_local)
                 fases = normalizar_fases(datos.get("fases", []), fecha_hoy_local)
                 dependencias = normalizar_dependencias(datos.get("dependencias", []), fases)
             except (TypeError, ValueError, OverflowError) as error:
@@ -316,14 +396,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             mision = {
                 "id": uuid.uuid4().hex[:10],
-                "titulo": titulo[:160],
-                "descripcion": str(datos.get("descripcion", "")).strip()[:1000],
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin,
-                "notificar_inicio": bool(datos.get("notificar_inicio", False)),
-                "notificar_fin": bool(datos.get("notificar_fin", False)),
+                **campos,
                 "notificado_inicio": "",
                 "notificado_fin": "",
+                "notificado_regular_el": "",
+                "completada_el": "",
                 "fases": fases,
                 "dependencias": dependencias,
                 "creada": datetime.now().isoformat(timespec="seconds"),
@@ -340,7 +417,7 @@ class Handler(BaseHTTPRequestHandler):
             extremo = str(datos.get("extremo", "")).strip()
             fecha = str(datos.get("fecha", "")).strip()[:10]
             fid = str(datos.get("id_fase", "")).strip()
-            if tipo not in TIPOS or extremo not in ("inicio", "fin") or not fecha:
+            if tipo not in TIPOS or extremo not in ("inicio", "fin", "regular") or not fecha:
                 self._error("Datos de notificación no válidos")
                 return
             data = cargar_misiones()
@@ -348,14 +425,96 @@ class Handler(BaseHTTPRequestHandler):
             if encontrada is None:
                 self._error("Misión no encontrada", 404)
                 return
+            if extremo == "regular" and fid:
+                self._error("El aviso de recurrencia pertenece a la misión")
+                return
             if fid:
                 fase = next((f for f in encontrada.get("fases", []) if f.get("id") == fid), None)
                 if fase is None:
                     self._error("Fase no encontrada", 404)
                     return
                 fase["notificado_" + extremo] = fecha
+            elif extremo == "regular":
+                encontrada["notificado_regular_el"] = fecha
             else:
                 encontrada["notificado_" + extremo] = fecha
+            guardar_misiones(data)
+            self._json({"ok": True})
+            return
+
+        if ruta == "/api/misiones/editar":
+            tipo_origen = str(datos.get("tipo_origen", "")).strip()
+            if tipo_origen not in TIPOS:
+                self._error("Categoría de misión no válida")
+                return
+            mid = str(datos.get("id", "")).strip()
+            data = cargar_misiones()
+            mision = next((m for m in data[tipo_origen] if m.get("id") == mid), None)
+            if mision is None:
+                self._error("Misión no encontrada", 404)
+                return
+            fecha_hoy_local = str(datos.get("fecha_hoy_local", "")).strip()[:10]
+            if not fecha_hoy_local:
+                fecha_hoy_local = datetime.now().date().isoformat()
+            try:
+                campos = validar_campos_mision(datos, fecha_hoy_local, mision.get("fecha_inicio", ""))
+                fases = normalizar_fases(datos.get("fases", mision.get("fases", [])), fecha_hoy_local, mision.get("fases", []))
+                dependencias = normalizar_dependencias(datos.get("dependencias", mision.get("dependencias", [])), fases)
+            except (TypeError, ValueError, OverflowError) as error:
+                self._error(str(error))
+                return
+            fases_antiguas = {fase.get("id"): fase for fase in mision.get("fases", [])}
+            for fase in fases:
+                antigua = fases_antiguas.get(fase["id"])
+                if antigua:
+                    fase["completada"] = bool(antigua.get("completada"))
+                    fase["fecha_completada"] = antigua.get("fecha_completada", "")
+                    for extremo in ("inicio", "fin"):
+                        fecha_campo = "fecha_" + extremo
+                        hora_campo = "hora_aviso_" + extremo
+                        if antigua.get(fecha_campo) == fase.get(fecha_campo) and antigua.get(hora_campo, "00:00" if extremo == "inicio" else "23:59") == fase.get(hora_campo):
+                            fase["notificado_" + extremo] = antigua.get("notificado_" + extremo, "")
+            avisos_cambiados = any(
+                mision.get(campo, defecto) != campos.get(campo)
+                for campo, defecto in (
+                    ("fecha_inicio", ""), ("fecha_fin", ""),
+                    ("hora_aviso_inicio", "00:00"), ("hora_aviso_fin", "23:59"),
+                )
+            )
+            tipo_destino = str(datos.get("tipo", tipo_origen)).strip()
+            if tipo_destino not in TIPOS:
+                self._error("Categoría de misión no válida")
+                return
+            horario_regular_cambiado = mision.get("hora_regular", "") != campos["hora_regular"]
+            mision.update(campos)
+            mision["fases"] = fases
+            mision["dependencias"] = dependencias
+            if avisos_cambiados:
+                mision["notificado_inicio"] = ""
+                mision["notificado_fin"] = ""
+            if horario_regular_cambiado:
+                mision["notificado_regular_el"] = ""
+            if tipo_destino != "diarias" and not mision.get("regular"):
+                mision["completada_el"] = ""
+            if tipo_destino != tipo_origen:
+                data[tipo_origen].remove(mision)
+                data[tipo_destino].append(mision)
+            guardar_misiones(data)
+            self._json({"ok": True, "tipo": tipo_destino, "mision": mision})
+            return
+
+        if ruta == "/api/misiones/cancelar":
+            tipo = str(datos.get("tipo", "")).strip()
+            mid = str(datos.get("id", "")).strip()
+            if tipo not in TIPOS:
+                self._error("Categoría de misión no válida")
+                return
+            data = cargar_misiones()
+            mision = next((m for m in data[tipo] if m.get("id") == mid), None)
+            if mision is None:
+                self._error("Misión no encontrada", 404)
+                return
+            data[tipo].remove(mision)
             guardar_misiones(data)
             self._json({"ok": True})
             return
@@ -415,9 +574,22 @@ class Handler(BaseHTTPRequestHandler):
         if ruta == "/api/misiones/completar":
             tipo = str(datos.get("tipo", "")).strip()
             mid = str(datos.get("id", "")).strip()
+            fecha_hoy_local = str(datos.get("fecha_hoy_local", "")).strip()[:10]
             if tipo not in TIPOS:
                 self._error("Tipo de mision no valido")
                 return
+            if fecha_hoy_local:
+                try:
+                    dia_local = datetime.strptime(fecha_hoy_local, "%Y-%m-%d").date()
+                except ValueError:
+                    self._error("La fecha local de hoy no es válida")
+                    return
+                if dia_local.isoformat() != fecha_hoy_local:
+                    self._error("La fecha local de hoy no es válida")
+                    return
+            else:
+                dia_local = datetime.now().date()
+                fecha_hoy_local = dia_local.isoformat()
             data = cargar_misiones()
             encontrada = None
             for m in data[tipo]:
@@ -427,15 +599,30 @@ class Handler(BaseHTTPRequestHandler):
             if encontrada is None:
                 self._error("Mision no encontrada", 404)
                 return
+            repetible = tipo == "diarias" or bool(encontrada.get("regular"))
+            if repetible and encontrada.get("completada_el") == fecha_hoy_local:
+                self._error("Esta misión ya se completó durante su ciclo actual", 409)
+                return
+            dia_semana_js = (dia_local.weekday() + 1) % 7
+            if encontrada.get("regular") and dia_semana_js not in encontrada.get("dias_regular", []):
+                self._error("Hoy no es uno de los días programados para esta misión", 409)
+                return
             if any(not fase.get("completada") for fase in encontrada.get("fases", [])):
                 self._error("Completa todas las fases antes de cerrar esta misión", 409)
                 return
-            encontrada["fecha_completada"] = datetime.now().isoformat(timespec="seconds")
-            añadir_al_csv(encontrada)
-            data[tipo].remove(encontrada)
+            registro, cuenta = registrar_completada(encontrada, tipo)
+            if repetible:
+                encontrada["completada_el"] = fecha_hoy_local
+                encontrada["fases"] = [
+                    {**fase, "completada": False, "fecha_completada": "", "notificado_inicio": "", "notificado_fin": ""}
+                    for fase in encontrada.get("fases", [])
+                ]
+                encontrada["notificado_regular_el"] = ""
+            else:
+                data[tipo].remove(encontrada)
             guardar_misiones(data)
             self._json(
-                {"ok": True, "completadas": contar_completadas()}, 200
+                {"ok": True, "completadas": cuenta, "repetible": repetible, "mision": encontrada, "registro": registro}, 200
             )
             return
 

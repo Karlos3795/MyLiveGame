@@ -29,6 +29,7 @@ const ORDEN = ["principales", "secundarias", "campo", "diarias"];
 const estado = {
   tipoActivo: "principales",
   misiones: { principales: [], secundarias: [], campo: [], diarias: [] },
+  historial: [],
   completadas: 0,
   cargando: false,
 };
@@ -41,7 +42,8 @@ let modoEditorFases = "idle";
 let faseConectadaDesde = "";
 let faseArrastrada = null;
 let faseEnEdicion = null;
-let misionEnEdicionGrado = null;
+let misionEnEdicion = null;
+let misionEnEdicionGrado = null; // legado del diálogo anterior de categoría
 const fasesDesplegadas = new Set();
 
 const $ = (sel) => document.querySelector(sel);
@@ -102,11 +104,32 @@ function fasesCompletadas(mision) {
   return (mision.fases || []).filter((fase) => fase.completada).length;
 }
 
+function misionVisible(tipo, mision) {
+  const hoy = fechaLocalHoy();
+  const repetible = tipo === "diarias" || mision.regular;
+  if (!repetible) return true;
+  if (mision.completada_el === hoy) return false;
+  if (mision.regular) {
+    const dia = new Date().getDay();
+    return (mision.dias_regular || []).includes(dia);
+  }
+  return true;
+}
+
+function porcentajeFases(mision) {
+  const fases = mision.fases || [];
+  const total = fases.reduce((suma, fase) => suma + Math.max(0, Number(fase.valor ?? 1)), 0);
+  if (!fases.length) return 0;
+  if (total === 0) return fases.every((fase) => fase.completada) ? 100 : 0;
+  const completado = fases.reduce((suma, fase) => suma + (fase.completada ? Math.max(0, Number(fase.valor ?? 1)) : 0), 0);
+  return Math.round((completado / total) * 100);
+}
+
 /* ---------- Render ---------- */
 function render() {
   const tipo = estado.tipoActivo;
   const info = TIPOS[tipo];
-  const misiones = estado.misiones[tipo] || [];
+  const misiones = (estado.misiones[tipo] || []).filter((mision) => misionVisible(tipo, mision));
 
   document.body.dataset.tipo = tipo;
   $("#titulo-seccion").textContent = info.nombre;
@@ -121,7 +144,7 @@ function render() {
 
   ORDEN.forEach((t) => {
     const contador = document.querySelector(`[data-contador="${t}"]`);
-    if (contador) contador.textContent = (estado.misiones[t] || []).length;
+    if (contador) contador.textContent = (estado.misiones[t] || []).filter((mision) => misionVisible(t, mision)).length;
   });
 
   const lista = $("#lista");
@@ -153,7 +176,8 @@ function render() {
 
     const fechas = textoFechas(mision);
     const tieneAvisos = mision.notificar_inicio || mision.notificar_fin;
-    if (fechas || tieneAvisos) {
+    const tieneRecurrencia = tipo === "diarias" || mision.regular;
+    if (fechas || tieneAvisos || tieneRecurrencia) {
       const meta = document.createElement("div");
       meta.className = "mision-meta";
       if (fechas) {
@@ -174,12 +198,37 @@ function render() {
         avisoFin.textContent = "Aviso de fin";
         meta.appendChild(avisoFin);
       }
+      if (tieneRecurrencia) {
+        const recurrencia = document.createElement("span");
+        recurrencia.className = "dato-recurrente";
+        recurrencia.textContent = mision.regular
+          ? `Regular · ${(mision.dias_regular || []).map((dia) => ["D", "L", "M", "X", "J", "V", "S"][dia]).join(" ")}${mision.hora_regular ? ` · ${mision.hora_regular}` : ""}`
+          : "Diaria · cada día";
+        meta.appendChild(recurrencia);
+      }
       cuerpo.appendChild(meta);
     }
 
     const fases = Array.isArray(mision.fases) ? mision.fases : [];
     const activas = fasesActivas(mision);
     if (fases.length) {
+      const progreso = document.createElement("div");
+      progreso.className = "progreso-mision";
+      const progresoCabecera = document.createElement("div");
+      progresoCabecera.className = "progreso-mision-cabecera";
+      const progresoEtiqueta = document.createElement("span");
+      progresoEtiqueta.textContent = "Progreso ponderado";
+      const progresoValor = document.createElement("strong");
+      progresoValor.textContent = `${porcentajeFases(mision)}%`;
+      progresoCabecera.append(progresoEtiqueta, progresoValor);
+      const barra = document.createElement("div");
+      barra.className = "progreso-mision-barra";
+      const relleno = document.createElement("span");
+      relleno.style.width = `${porcentajeFases(mision)}%`;
+      barra.appendChild(relleno);
+      progreso.append(progresoCabecera, barra);
+      cuerpo.appendChild(progreso);
+
       const desplegable = document.createElement("details");
       desplegable.className = "mision-fases";
       desplegable.open = fasesDesplegadas.has(mision.id);
@@ -237,9 +286,9 @@ function render() {
     ajustar.type = "button";
     ajustar.className = "btn-ajustes-mision";
     ajustar.textContent = "⚙";
-    ajustar.title = "Cambiar categoría de la misión";
-    ajustar.setAttribute("aria-label", "Cambiar categoría de la misión");
-    ajustar.addEventListener("click", () => abrirAjustesGrado(tipo, mision));
+    ajustar.title = "Ajustes de misión";
+    ajustar.setAttribute("aria-label", "Ajustes de misión");
+    ajustar.addEventListener("click", () => abrirAjustesMision(tipo, mision));
     const boton = document.createElement("button");
     boton.type = "button";
     boton.className = "btn-completar";
@@ -266,6 +315,7 @@ async function cargar() {
       estado.misiones[t] = Array.isArray(misiones[t]) ? misiones[t] : [];
     });
     estado.completadas = Number(datos.completadas) || 0;
+    estado.historial = Array.isArray(datos.historial) ? datos.historial : [];
     render();
     comprobarAvisosFecha();
   } catch (error) {
@@ -284,15 +334,17 @@ async function completarMision(tipo, mision, elemento, boton) {
   boton.disabled = true;
   boton.textContent = "Archivando…";
   try {
-    const datos = await Almacen.completar(tipo, mision.id);
-    estado.misiones[tipo] = estado.misiones[tipo].filter((m) => m.id !== mision.id);
+    const datos = await Almacen.completar(tipo, mision.id, fechaLocalHoy());
+    if (datos.repetible) Object.assign(mision, datos.mision);
+    else estado.misiones[tipo] = estado.misiones[tipo].filter((m) => m.id !== mision.id);
+    if (datos.registro) estado.historial.unshift(datos.registro);
     estado.completadas = Number.isFinite(datos.completadas)
       ? datos.completadas
       : estado.completadas + 1;
     elemento.classList.add("saliendo");
     setTimeout(() => {
       render();
-      mostrarAviso(`«${mision.titulo}» completada y archivada.`);
+      mostrarAviso(datos.repetible ? `«${mision.titulo}» completada. Volverá a activarse según su frecuencia.` : `«${mision.titulo}» completada y archivada.`);
     }, 300);
   } catch (error) {
     boton.disabled = false;
@@ -304,9 +356,16 @@ async function completarMision(tipo, mision, elemento, boton) {
 function abrirDialogo() {
   const form = $("#form-mision");
   form.reset();
+  document.querySelectorAll(".ajustes-avanzados").forEach((details) => { details.open = false; });
+  misionEnEdicion = null;
   fasesGuardadasEnBorrador = [];
   dependenciasGuardadasEnBorrador = [];
   actualizarBotonFases();
+  $("#dialogo-titulo").textContent = "Nueva misión";
+  $("#btn-guardar-mision").textContent = "Desplegar misión";
+  $("#btn-cancelar-mision").hidden = true;
+  $("#campo-tipo").value = estado.tipoActivo;
+  actualizarControlesRegular();
   actualizarDisponibilidadAvisos();
   $("#form-error").hidden = true;
   $("#dialogo-tipo").textContent = TIPOS[estado.tipoActivo].nombre.toUpperCase();
@@ -314,8 +373,44 @@ function abrirDialogo() {
   $("#campo-titulo").focus();
 }
 
+function abrirAjustesMision(tipo, mision) {
+  misionEnEdicion = { tipo, id: mision.id, mision };
+  const form = $("#form-mision");
+  form.reset();
+  document.querySelectorAll(".ajustes-avanzados").forEach((details) => { details.open = false; });
+  $("#campo-titulo").value = mision.titulo || "";
+  $("#campo-descripcion").value = mision.descripcion || "";
+  $("#campo-inicio").value = mision.fecha_inicio || "";
+  $("#campo-fin").value = mision.fecha_fin || "";
+  $("#campo-hora-inicio").value = mision.hora_aviso_inicio || "00:00";
+  $("#campo-hora-fin").value = mision.hora_aviso_fin || "23:59";
+  $("#aviso-inicio").checked = Boolean(mision.notificar_inicio);
+  $("#aviso-fin").checked = Boolean(mision.notificar_fin);
+  $("#campo-tipo").value = tipo;
+  $("#campo-regular").checked = Boolean(mision.regular);
+  $("#regular-opciones").hidden = !mision.regular;
+  $("#campo-hora-regular").value = mision.hora_regular || "";
+  $("#campo-aviso-regular").checked = Boolean(mision.notificar_regular);
+  actualizarControlesRegular();
+  document.querySelectorAll(".dia-regular").forEach((control) => {
+    control.checked = (mision.dias_regular || []).includes(Number(control.value));
+  });
+  fasesGuardadasEnBorrador = clonar(mision.fases || []);
+  dependenciasGuardadasEnBorrador = clonar(mision.dependencias || []);
+  actualizarBotonFases();
+  actualizarDisponibilidadAvisos();
+  $("#form-error").hidden = true;
+  $("#dialogo-tipo").textContent = TIPOS[tipo].nombre.toUpperCase();
+  $("#dialogo-titulo").textContent = "Ajustes de misión";
+  $("#btn-guardar-mision").textContent = "Guardar cambios";
+  $("#btn-cancelar-mision").hidden = false;
+  $("#dialogo").showModal();
+  $("#campo-titulo").focus();
+}
+
 function cerrarDialogo() {
   $("#dialogo").close();
+  misionEnEdicion = null;
 }
 
 /* ---------- Constructor visual de fases ---------- */
@@ -632,6 +727,8 @@ function abrirAjustesFase(id) {
   $("#ajuste-fase-descripcion").value = faseEnEdicion.descripcion || "";
   $("#ajuste-fase-inicio").value = faseEnEdicion.fecha_inicio || "";
   $("#ajuste-fase-fin").value = faseEnEdicion.fecha_fin || "";
+  $("#ajuste-fase-hora-inicio").value = faseEnEdicion.hora_aviso_inicio || "00:00";
+  $("#ajuste-fase-hora-fin").value = faseEnEdicion.hora_aviso_fin || "23:59";
   actualizarFechasAjusteFase();
   $("#ajuste-fase-aviso-inicio").checked = Boolean(faseEnEdicion.notificar_inicio);
   $("#ajuste-fase-aviso-fin").checked = Boolean(faseEnEdicion.notificar_fin);
@@ -652,8 +749,11 @@ function guardarAjustesFase(evento) {
   const error = $("#ajuste-fase-error");
   const fallo = (mensaje) => { error.textContent = mensaje; error.hidden = false; };
   if (!titulo) return fallo("El título de la fase es obligatorio.");
-  if (inicio && inicio < fechaLocalHoy()) return fallo("La fecha inicio de la fase no puede ser anterior a hoy.");
+  if (inicio && inicio < fechaLocalHoy() && inicio !== (faseEnEdicion.fecha_inicio || "")) return fallo("La fecha inicio de la fase no puede ser anterior a hoy.");
   if (inicio && fin && fin < inicio) return fallo("La fecha fin no puede ser anterior a la fecha inicio.");
+  const horaInicio = $("#ajuste-fase-hora-inicio").value || "00:00";
+  const horaFin = $("#ajuste-fase-hora-fin").value || "23:59";
+  if (inicio && fin && inicio === fin && horaFin <= horaInicio) return fallo("La hora fin debe ser posterior a la hora de inicio si comparten fecha.");
   if (!Number.isFinite(valor) || valor < 0) return fallo("El peso o valor debe ser un número igual o mayor que cero.");
 
   Object.assign(faseEnEdicion, {
@@ -661,6 +761,8 @@ function guardarAjustesFase(evento) {
     descripcion: $("#ajuste-fase-descripcion").value.trim(),
     fecha_inicio: inicio,
     fecha_fin: fin,
+    hora_aviso_inicio: horaInicio,
+    hora_aviso_fin: horaFin,
     notificar_inicio: $("#ajuste-fase-aviso-inicio").checked,
     notificar_fin: $("#ajuste-fase-aviso-fin").checked,
     valor,
@@ -687,6 +789,8 @@ function actualizarControlesAvisoAjusteFase() {
   const avisoFin = $("#ajuste-fase-aviso-fin");
   avisoInicio.disabled = !inicio;
   avisoFin.disabled = !fin;
+  $("#ajuste-fase-hora-inicio").disabled = !inicio || !avisoInicio.checked;
+  $("#ajuste-fase-hora-fin").disabled = !fin || !avisoFin.checked;
   if (!inicio) avisoInicio.checked = false;
   if (!fin) avisoFin.checked = false;
 }
@@ -756,50 +860,88 @@ async function completarFaseMision(tipo, mision, fase, boton) {
 
 async function enviarFormulario(evento) {
   evento.preventDefault();
-  const titulo = $("#campo-titulo").value.trim();
-  const descripcion = $("#campo-descripcion").value.trim();
-  const inicio = $("#campo-inicio").value;
-  const fin = $("#campo-fin").value;
-
   const formError = $("#form-error");
   const fallo = (mensaje) => {
     formError.textContent = mensaje;
     formError.hidden = false;
   };
+  const datos = {
+    titulo: $("#campo-titulo").value.trim(),
+    descripcion: $("#campo-descripcion").value.trim(),
+    fecha_inicio: $("#campo-inicio").value,
+    fecha_fin: $("#campo-fin").value,
+    hora_aviso_inicio: $("#campo-hora-inicio").value || "00:00",
+    hora_aviso_fin: $("#campo-hora-fin").value || "23:59",
+    notificar_inicio: $("#aviso-inicio").checked,
+    notificar_fin: $("#aviso-fin").checked,
+    tipo: $("#campo-tipo").value,
+    regular: $("#campo-regular").checked,
+    dias_regular: Array.from(document.querySelectorAll(".dia-regular:checked"), (control) => Number(control.value)),
+    hora_regular: $("#campo-hora-regular").value,
+    notificar_regular: $("#campo-aviso-regular").checked,
+    fecha_hoy_local: fechaLocalHoy(),
+    fases: fasesGuardadasEnBorrador,
+    dependencias: dependenciasGuardadasEnBorrador,
+  };
 
-  if (!titulo) return fallo("El título es obligatorio.");
-  if (inicio && inicio < fechaLocalHoy()) return fallo("La fecha inicio no puede ser anterior a hoy.");
-  if (inicio && fin && fin < inicio) return fallo("La fecha fin no puede ser anterior a la fecha inicio.");
+  if (!datos.titulo) return fallo("El título es obligatorio.");
+  const fechaInicioAntiguaPermitida = misionEnEdicion
+    && datos.fecha_inicio === (misionEnEdicion.mision.fecha_inicio || "");
+  if (datos.fecha_inicio && datos.fecha_inicio < fechaLocalHoy() && !fechaInicioAntiguaPermitida) {
+    return fallo("La fecha inicio no puede ser anterior a hoy.");
+  }
+  if (datos.fecha_inicio && datos.fecha_fin && datos.fecha_fin < datos.fecha_inicio) {
+    return fallo("La fecha fin no puede ser anterior a la fecha inicio.");
+  }
+  if (datos.fecha_inicio && datos.fecha_fin && datos.fecha_inicio === datos.fecha_fin
+      && datos.hora_aviso_fin <= datos.hora_aviso_inicio) {
+    return fallo("Si inicio y fin coinciden, la hora fin debe ser posterior a la hora inicio.");
+  }
+  if (datos.regular && datos.dias_regular.length === 0) {
+    return fallo("Selecciona al menos un día para la misión regular.");
+  }
 
   const boton = $("#form-mision").querySelector('button[type="submit"]');
+  const estabaEditando = Boolean(misionEnEdicion);
   boton.disabled = true;
-  boton.textContent = "Desplegando…";
+  boton.textContent = estabaEditando ? "Guardando…" : "Desplegando…";
 
   try {
-    const datos = await Almacen.crear({
-      tipo: estado.tipoActivo,
-      titulo,
-      descripcion,
-      fecha_inicio: inicio,
-      fecha_fin: fin,
-      fecha_hoy_local: fechaLocalHoy(),
-      notificar_inicio: $("#aviso-inicio").checked,
-      notificar_fin: $("#aviso-fin").checked,
-      fases: fasesGuardadasEnBorrador,
-      dependencias: dependenciasGuardadasEnBorrador,
-    });
-    estado.misiones[estado.tipoActivo].push(datos.mision);
-    fasesGuardadasEnBorrador = [];
-    dependenciasGuardadasEnBorrador = [];
+    if (misionEnEdicion) {
+      const { tipo: tipoOrigen, id } = misionEnEdicion;
+      const resultado = await Almacen.actualizar(tipoOrigen, id, datos);
+      estado.misiones[tipoOrigen] = estado.misiones[tipoOrigen].filter((m) => m.id !== id);
+      estado.misiones[resultado.tipo].push(resultado.mision);
+    } else {
+      const resultado = await Almacen.crear({ ...datos, tipo: datos.tipo || estado.tipoActivo });
+      estado.misiones[datos.tipo || estado.tipoActivo].push(resultado.mision);
+    }
     actualizarBotonFases();
     cerrarDialogo();
     render();
-    mostrarAviso("Misión desplegada.");
+    mostrarAviso(estabaEditando ? "Ajustes de misión guardados." : "Misión desplegada.");
   } catch (error) {
     fallo(mensajeError(error, "No se pudo crear la misión."));
   } finally {
     boton.disabled = false;
-    boton.textContent = "Desplegar misión";
+    boton.textContent = misionEnEdicion ? "Guardar cambios" : "Desplegar misión";
+  }
+}
+
+async function cancelarMisionActual() {
+  if (!misionEnEdicion) return;
+  if (!window.confirm(`¿Cancelar la misión «${misionEnEdicion.mision.titulo}»? Esta acción la quitará de las misiones activas.`)) return;
+  const { tipo, id } = misionEnEdicion;
+  try {
+    await Almacen.cancelar(tipo, id);
+    estado.misiones[tipo] = estado.misiones[tipo].filter((mision) => mision.id !== id);
+    cerrarDialogo();
+    render();
+    mostrarAviso("Misión cancelada.");
+  } catch (error) {
+    const formError = $("#form-error");
+    formError.textContent = mensajeError(error, "No se pudo cancelar la misión.");
+    formError.hidden = false;
   }
 }
 
@@ -809,18 +951,34 @@ function actualizarDisponibilidadAvisos() {
   const fin = $("#campo-fin");
   const avisoInicio = $("#aviso-inicio");
   const avisoFin = $("#aviso-fin");
-  inicio.min = fechaLocalHoy();
+  const inicioAnterior = misionEnEdicion && misionEnEdicion.mision.fecha_inicio;
+  inicio.min = inicioAnterior && inicioAnterior < fechaLocalHoy() && inicio.value === inicioAnterior
+    ? inicioAnterior
+    : fechaLocalHoy();
   fin.min = inicio.value || "";
   avisoInicio.disabled = !inicio.value;
   avisoFin.disabled = !fin.value;
+  $("#campo-hora-inicio").disabled = !inicio.value || !avisoInicio.checked;
+  $("#campo-hora-fin").disabled = !fin.value || !avisoFin.checked;
   if (!inicio.value) avisoInicio.checked = false;
   if (!fin.value) avisoFin.checked = false;
+}
+
+function actualizarControlesRegular() {
+  const regular = $("#campo-regular").checked;
+  const hora = $("#campo-hora-regular");
+  const aviso = $("#campo-aviso-regular");
+  $("#regular-opciones").hidden = !regular;
+  hora.disabled = !regular;
+  aviso.disabled = !regular || !hora.value;
+  if (!regular || !hora.value) aviso.checked = false;
 }
 
 function actualizarFechasAjusteFase() {
   const inicio = $("#ajuste-fase-inicio");
   const fin = $("#ajuste-fase-fin");
-  inicio.min = fechaLocalHoy();
+  const anterior = faseEnEdicion && faseEnEdicion.fecha_inicio;
+  inicio.min = anterior && anterior < fechaLocalHoy() && inicio.value === anterior ? anterior : fechaLocalHoy();
   fin.min = inicio.value || "";
 }
 
@@ -876,16 +1034,16 @@ async function comprobarAvisosFecha() {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const hoy = fechaLocalHoy();
   const ahora = new Date();
+  const horaActual = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
   const revisarAvisos = async (tipo, mision, objetivo, idFase = "") => {
     for (const extremo of ["inicio", "fin"]) {
       const fecha = objetivo[`fecha_${extremo}`];
       const habilitado = objetivo[`notificar_${extremo}`];
       const yaNotificado = objetivo[`notificado_${extremo}`] === fecha;
       const clave = `${tipo}:${mision.id}:${idFase || "mision"}:${extremo}:${fecha}`;
-      const horaProgramada = extremo === "inicio" ? 0 : 23;
-      const minutoProgramado = extremo === "inicio" ? 0 : 59;
-      const esHoraProgramada = ahora.getHours() === horaProgramada && ahora.getMinutes() === minutoProgramado;
-      if (!habilitado || !fecha || fecha !== hoy || !esHoraProgramada || yaNotificado || avisosEmitidosEnSesion.has(clave)) continue;
+      const horaPorDefecto = extremo === "inicio" ? "00:00" : "23:59";
+      const horaProgramada = objetivo[`hora_aviso_${extremo}`] || horaPorDefecto;
+      if (!habilitado || !fecha || fecha !== hoy || horaActual !== horaProgramada || yaNotificado || avisosEmitidosEnSesion.has(clave)) continue;
       avisosEmitidosEnSesion.add(clave);
       try {
         const sufijo = idFase ? ` · ${mision.titulo}` : "";
@@ -904,17 +1062,41 @@ async function comprobarAvisosFecha() {
 
   for (const tipo of ORDEN) {
     for (const mision of estado.misiones[tipo] || []) {
+      if (!misionVisible(tipo, mision)) continue;
       await revisarAvisos(tipo, mision, mision);
       for (const fase of mision.fases || []) {
         if (!fase.completada && faseEsActiva(mision, fase)) {
           await revisarAvisos(tipo, mision, fase, fase.id);
         }
       }
+      if (mision.regular && mision.notificar_regular && mision.hora_regular
+          && (mision.dias_regular || []).includes(ahora.getDay())
+          && mision.notificado_regular_el !== hoy && mision.hora_regular === horaActual) {
+        const clave = `${tipo}:${mision.id}:regular:${hoy}`;
+        if (!avisosEmitidosEnSesion.has(clave)) {
+          avisosEmitidosEnSesion.add(clave);
+          try {
+            await mostrarNotificacion("Misión regular disponible", mision.titulo, clave);
+            await Almacen.marcarNotificada(tipo, mision.id, "regular", hoy);
+            mision.notificado_regular_el = hoy;
+          } catch (error) {
+            mostrarAviso(mensajeError(error, "No se pudo mostrar el aviso de recurrencia."), "error");
+          }
+        }
+      }
     }
   }
 }
 
-setInterval(comprobarAvisosFecha, 10 * 1000);
+let ultimoDiaVisto = fechaLocalHoy();
+setInterval(() => {
+  const hoy = fechaLocalHoy();
+  if (hoy !== ultimoDiaVisto) {
+    ultimoDiaVisto = hoy;
+    render();
+  }
+  comprobarAvisosFecha();
+}, 10 * 1000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) comprobarAvisosFecha();
 });
@@ -931,6 +1113,50 @@ async function descargarCSV(evento) {
   } catch (error) {
     mostrarAviso(mensajeError(error, "No se pudo descargar el CSV."), "error");
   }
+}
+
+/* ---------- Historial de completadas ---------- */
+function renderHistorial() {
+  const texto = $("#historial-busqueda").value.trim().toLocaleLowerCase("es");
+  const tipo = $("#historial-tipo").value;
+  const desde = $("#historial-desde").value;
+  const hasta = $("#historial-hasta").value;
+  const resultados = [...estado.historial]
+    .filter((registro) => !texto || String(registro.titulo || "").toLocaleLowerCase("es").includes(texto))
+    .filter((registro) => !tipo || registro.tipo === tipo)
+    .filter((registro) => {
+      const dia = String(registro.fecha_completada || "").slice(0, 10);
+      return (!desde || dia >= desde) && (!hasta || dia <= hasta);
+    })
+    .sort((a, b) => String(b.fecha_completada || "").localeCompare(String(a.fecha_completada || "")));
+
+  const lista = $("#lista-historial");
+  lista.innerHTML = "";
+  resultados.forEach((registro) => {
+    const fila = document.createElement("li");
+    fila.className = "historial-item";
+    const cuerpo = document.createElement("div");
+    cuerpo.className = "historial-item-cuerpo";
+    const titulo = document.createElement("strong");
+    titulo.textContent = registro.titulo || "Misión sin título";
+    const descripcion = document.createElement("p");
+    descripcion.textContent = registro.descripcion || "";
+    const meta = document.createElement("small");
+    const tipoNombre = TIPOS[registro.tipo]?.nombre || "Tipo anterior no registrado";
+    const fecha = registro.fecha_completada ? new Date(registro.fecha_completada).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "Fecha desconocida";
+    meta.textContent = `${tipoNombre} · ${fecha}`;
+    cuerpo.append(titulo, descripcion, meta);
+    fila.appendChild(cuerpo);
+    lista.appendChild(fila);
+  });
+  $("#historial-resumen").textContent = `${resultados.length} misión(es) completada(s)`;
+  $("#historial-vacio").hidden = resultados.length > 0;
+}
+
+function abrirHistorial() {
+  renderHistorial();
+  $("#dialogo-historial").showModal();
+  $("#historial-busqueda").focus();
 }
 
 /* ---------- Instalación (solo app) ---------- */
@@ -1024,10 +1250,27 @@ $("#btn-cerrar").addEventListener("click", cerrarDialogo);
 $("#btn-cancelar").addEventListener("click", cerrarDialogo);
 $("#form-mision").addEventListener("submit", enviarFormulario);
 $("#btn-csv").addEventListener("click", descargarCSV);
+$("#btn-historial").addEventListener("click", abrirHistorial);
+$("#btn-cerrar-historial").addEventListener("click", () => $("#dialogo-historial").close());
+$("#historial-busqueda").addEventListener("input", renderHistorial);
+$("#historial-tipo").addEventListener("change", renderHistorial);
+$("#historial-desde").addEventListener("change", renderHistorial);
+$("#historial-hasta").addEventListener("change", renderHistorial);
+$("#btn-cancelar-mision").addEventListener("click", cancelarMisionActual);
 $("#campo-inicio").addEventListener("change", actualizarDisponibilidadAvisos);
 $("#campo-fin").addEventListener("change", actualizarDisponibilidadAvisos);
 $("#aviso-inicio").addEventListener("change", activarAvisoFecha);
 $("#aviso-fin").addEventListener("change", activarAvisoFecha);
+$("#aviso-inicio").addEventListener("change", actualizarDisponibilidadAvisos);
+$("#aviso-fin").addEventListener("change", actualizarDisponibilidadAvisos);
+$("#campo-regular").addEventListener("change", actualizarControlesRegular);
+$("#campo-hora-regular").addEventListener("change", () => {
+  const activar = Boolean($("#campo-hora-regular").value) && !$("#campo-aviso-regular").checked;
+  if (activar) $("#campo-aviso-regular").checked = true;
+  actualizarControlesRegular();
+  if (activar) activarAvisoFecha({ currentTarget: $("#campo-aviso-regular") });
+});
+$("#campo-aviso-regular").addEventListener("change", activarAvisoFecha);
 $("#btn-anadir-fase").addEventListener("click", abrirEditorFases);
 $("#btn-cerrar-editor-fases").addEventListener("click", cancelarEditorFases);
 $("#btn-cancelar-editor-fases").addEventListener("click", cancelarEditorFases);
@@ -1063,12 +1306,17 @@ $("#ajuste-fase-inicio").addEventListener("change", () => {
 $("#ajuste-fase-fin").addEventListener("change", actualizarControlesAvisoAjusteFase);
 $("#ajuste-fase-aviso-inicio").addEventListener("change", activarAvisoFecha);
 $("#ajuste-fase-aviso-fin").addEventListener("change", activarAvisoFecha);
+$("#ajuste-fase-aviso-inicio").addEventListener("change", actualizarControlesAvisoAjusteFase);
+$("#ajuste-fase-aviso-fin").addEventListener("change", actualizarControlesAvisoAjusteFase);
 $("#form-grado").addEventListener("submit", guardarGrado);
 $("#btn-cerrar-grado").addEventListener("click", () => $("#dialogo-grado").close());
 $("#btn-cancelar-grado").addEventListener("click", () => $("#dialogo-grado").close());
 
 $("#dialogo").addEventListener("click", (evento) => {
   if (evento.target === $("#dialogo")) cerrarDialogo();
+});
+$("#dialogo-historial").addEventListener("click", (evento) => {
+  if (evento.target === $("#dialogo-historial")) $("#dialogo-historial").close();
 });
 
 configurarInstalacion();

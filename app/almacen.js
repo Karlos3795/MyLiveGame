@@ -46,8 +46,16 @@ function normalizarMisiones(datos) {
           fecha_fin: String(m.fecha_fin || "").slice(0, 10),
           notificar_inicio: Boolean(m.notificar_inicio),
           notificar_fin: Boolean(m.notificar_fin),
+          hora_aviso_inicio: horaNormalizada(m.hora_aviso_inicio, "00:00"),
+          hora_aviso_fin: horaNormalizada(m.hora_aviso_fin, "23:59"),
           notificado_inicio: String(m.notificado_inicio || "").slice(0, 10),
           notificado_fin: String(m.notificado_fin || "").slice(0, 10),
+          notificado_regular_el: String(m.notificado_regular_el || "").slice(0, 10),
+          regular: Boolean(m.regular),
+          dias_regular: normalizarDias(m.dias_regular),
+          hora_regular: horaNormalizada(m.hora_regular, ""),
+          notificar_regular: Boolean(m.notificar_regular),
+          completada_el: String(m.completada_el || "").slice(0, 10),
           creada: String(m.creada || fechaAhora()),
           fases: normalizarFases(m.fases),
           dependencias: normalizarDependencias(m.dependencias, m.fases),
@@ -74,6 +82,8 @@ function normalizarFases(fases) {
       notificar_fin: Boolean(fase.notificar_fin),
       notificado_inicio: String(fase.notificado_inicio || "").slice(0, 10),
       notificado_fin: String(fase.notificado_fin || "").slice(0, 10),
+      hora_aviso_inicio: horaNormalizada(fase.hora_aviso_inicio, "00:00"),
+      hora_aviso_fin: horaNormalizada(fase.hora_aviso_fin, "23:59"),
       valor: Number.isFinite(Number(fase.valor)) && Number(fase.valor) >= 0 ? Number(fase.valor) : 1,
       x: Math.max(8, Math.min(930, Number(fase.x) || 24)),
       y: Math.max(8, Math.min(460, Number(fase.y) || 24)),
@@ -81,6 +91,82 @@ function normalizarFases(fases) {
       fecha_completada: String(fase.fecha_completada || ""),
     };
   });
+}
+
+function horaNormalizada(valor, porDefecto) {
+  const hora = String(valor || "");
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(hora) ? hora : porDefecto;
+}
+
+function normalizarDias(dias) {
+  if (!Array.isArray(dias)) return [];
+  return [...new Set(dias.map(Number).filter((dia) => Number.isInteger(dia) && dia >= 0 && dia <= 6))];
+}
+
+function hoyLocal() {
+  const ahora = new Date();
+  return new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function validarFechasYRegular(datos, inicioPasadoPermitido = "") {
+  const inicio = String(datos.fecha_inicio || "").trim().slice(0, 10);
+  const fin = String(datos.fecha_fin || "").trim().slice(0, 10);
+  const horaInicio = horaNormalizada(datos.hora_aviso_inicio, "00:00");
+  const horaFin = horaNormalizada(datos.hora_aviso_fin, "23:59");
+  if (inicio && inicio < hoyLocal() && inicio !== inicioPasadoPermitido) throw new Error("La fecha inicio no puede ser anterior a hoy.");
+  if (inicio && fin && fin < inicio) throw new Error("La fecha fin no puede ser anterior a la fecha inicio.");
+  if (inicio && fin && inicio === fin && horaFin <= horaInicio) {
+    throw new Error("Si inicio y fin coinciden, la hora fin debe ser posterior a la hora inicio.");
+  }
+  if (datos.hora_aviso_inicio && !/^([01]\d|2[0-3]):[0-5]\d$/.test(datos.hora_aviso_inicio)) throw new Error("La hora del aviso de inicio no es válida.");
+  if (datos.hora_aviso_fin && !/^([01]\d|2[0-3]):[0-5]\d$/.test(datos.hora_aviso_fin)) throw new Error("La hora del aviso de fin no es válida.");
+  const regular = Boolean(datos.regular);
+  const dias = normalizarDias(datos.dias_regular);
+  if (regular && dias.length === 0) throw new Error("Selecciona al menos un día para la misión regular.");
+  if (datos.hora_regular && !/^([01]\d|2[0-3]):[0-5]\d$/.test(datos.hora_regular)) throw new Error("La hora de reactivación no es válida.");
+  return { inicio, fin, horaInicio, horaFin, regular, dias, horaRegular: horaNormalizada(datos.hora_regular, "") };
+}
+
+function faseReiniciada(fase) {
+  return {
+    ...fase,
+    completada: false,
+    fecha_completada: "",
+    notificado_inicio: "",
+    notificado_fin: "",
+  };
+}
+
+function prepararFases(fasesCrudas, dependenciasCrudas, hoy = hoyLocal(), fasesAnteriores = []) {
+  if (fasesCrudas != null && !Array.isArray(fasesCrudas)) throw new Error("Los datos de las fases no son válidos.");
+  const fases = normalizarFases(fasesCrudas);
+  const fechasInicioAnteriores = new Map((fasesAnteriores || []).map((fase) => [fase.id, fase.fecha_inicio]));
+  const dependencias = normalizarDependencias(dependenciasCrudas, fases);
+  if (dependencias.length !== (Array.isArray(dependenciasCrudas) ? dependenciasCrudas.length : 0)) {
+    throw new Error("Hay una flecha inválida entre fases.");
+  }
+  if (grafoTieneCiclos(fases, dependencias)) throw new Error("Las dependencias entre fases no pueden formar ciclos.");
+  fases.forEach((fase) => {
+    if (!fase.titulo) throw new Error("Cada fase necesita un título.");
+    if (fase.fecha_inicio && fase.fecha_inicio < hoy && fase.fecha_inicio !== fechasInicioAnteriores.get(fase.id)) {
+      throw new Error(`La fase «${fase.titulo}» tiene una fecha inicio anterior a hoy.`);
+    }
+    if (fase.fecha_inicio && fase.fecha_fin && fase.fecha_fin < fase.fecha_inicio) throw new Error(`La fecha fin de «${fase.titulo}» es anterior a su inicio.`);
+    if (fase.fecha_inicio && fase.fecha_fin && fase.fecha_inicio === fase.fecha_fin && fase.hora_aviso_fin <= fase.hora_aviso_inicio) {
+      throw new Error(`La hora fin de «${fase.titulo}» debe ser posterior a su hora de inicio.`);
+    }
+  });
+  return { fases, dependencias };
+}
+
+function leerHistorial() {
+  const registros = leerJSON(CLAVE_COMPLETADAS, []);
+  if (!Array.isArray(registros)) return [];
+  return registros.map((registro) => ({
+    ...registro,
+    tipo: TIPOS_APP.includes(registro.tipo) ? registro.tipo : "",
+    fecha_completada: String(registro.fecha_completada || ""),
+  }));
 }
 
 function normalizarDependencias(dependencias, fases) {
@@ -192,9 +278,11 @@ window.Almacen = {
   modo: "local",
 
   async cargar() {
+    const historial = leerHistorial();
     return {
       misiones: normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias())),
-      completadas: leerJSON(CLAVE_COMPLETADAS, []).length,
+      completadas: historial.length,
+      historial,
     };
   },
 
@@ -207,44 +295,28 @@ window.Almacen = {
     if (!titulo) {
       throw new Error("El título es obligatorio.");
     }
-    const fechaInicio = String(datos.fecha_inicio || "").trim().slice(0, 10);
-    const fechaFin = String(datos.fecha_fin || "").trim().slice(0, 10);
-    const ahora = new Date();
-    const hoy = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    if (fechaInicio && fechaInicio < hoy) {
-      throw new Error("La fecha inicio no puede ser anterior a hoy.");
-    }
-    if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
-      throw new Error("La fecha fin no puede ser anterior a la fecha inicio.");
-    }
-    const fases = normalizarFases(datos.fases);
-    const dependencias = normalizarDependencias(datos.dependencias, fases);
-    if (dependencias.length !== (Array.isArray(datos.dependencias) ? datos.dependencias.length : 0)) {
-      throw new Error("Hay una flecha inválida entre fases.");
-    }
-    if (grafoTieneCiclos(fases, dependencias)) {
-      throw new Error("Las dependencias entre fases no pueden formar ciclos.");
-    }
-    fases.forEach((fase) => {
-      if (!fase.titulo) throw new Error("Cada fase necesita un título.");
-      if (fase.fecha_inicio && fase.fecha_inicio < hoy) {
-        throw new Error(`La fase «${fase.titulo}» tiene una fecha inicio anterior a hoy.`);
-      }
-      if (fase.fecha_inicio && fase.fecha_fin && fase.fecha_fin < fase.fecha_inicio) {
-        throw new Error(`La fase «${fase.titulo}» tiene una fecha fin anterior a su inicio.`);
-      }
-    });
+    const reglas = validarFechasYRegular(datos);
+    const hoy = hoyLocal();
+    const { fases, dependencias } = prepararFases(datos.fases, datos.dependencias, hoy);
     const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
     const mision = {
       id: nuevoId(),
       titulo: titulo.slice(0, 160),
       descripcion: String(datos.descripcion || "").trim().slice(0, 1000),
-      fecha_inicio: fechaInicio,
-      fecha_fin: fechaFin,
+      fecha_inicio: reglas.inicio,
+      fecha_fin: reglas.fin,
       notificar_inicio: Boolean(datos.notificar_inicio),
       notificar_fin: Boolean(datos.notificar_fin),
+      hora_aviso_inicio: reglas.horaInicio,
+      hora_aviso_fin: reglas.horaFin,
       notificado_inicio: "",
       notificado_fin: "",
+      notificado_regular_el: "",
+      regular: reglas.regular,
+      dias_regular: reglas.dias,
+      hora_regular: reglas.horaRegular,
+      notificar_regular: Boolean(datos.notificar_regular && reglas.horaRegular),
+      completada_el: "",
       fases,
       dependencias,
       creada: fechaAhora(),
@@ -254,7 +326,7 @@ window.Almacen = {
     return { ok: true, mision };
   },
 
-  async completar(tipo, id) {
+  async completar(tipo, id, fechaHoyLocal = hoyLocal()) {
     if (!TIPOS_APP.includes(tipo)) {
       throw new Error("Tipo de misión no válido.");
     }
@@ -263,16 +335,31 @@ window.Almacen = {
     if (indice === -1) {
       throw new Error("Misión no encontrada.");
     }
-    if (misiones[tipo][indice].fases.some((fase) => !fase.completada)) {
+    const mision = misiones[tipo][indice];
+    const repetible = tipo === "diarias" || mision.regular;
+    if (repetible && mision.completada_el === fechaHoyLocal) {
+      throw new Error("Esta misión ya se completó durante su ciclo actual.");
+    }
+    if (mision.regular && !(mision.dias_regular || []).includes(new Date(`${fechaHoyLocal}T12:00:00`).getDay())) {
+      throw new Error("Hoy no es uno de los días programados para esta misión.");
+    }
+    if (mision.fases.some((fase) => !fase.completada)) {
       throw new Error("Completa todas las fases antes de cerrar esta misión.");
     }
-    const [mision] = misiones[tipo].splice(indice, 1);
-    mision.fecha_completada = fechaAhora();
-    const completadas = leerJSON(CLAVE_COMPLETADAS, []);
-    completadas.push(mision);
-    escribirJSON(CLAVE_COMPLETADAS, completadas);
+    const fecha_completada = fechaAhora();
+    const registro = { ...JSON.parse(JSON.stringify(mision)), tipo, fecha_completada };
+    const historial = leerHistorial();
+    historial.push(registro);
+    if (repetible) {
+      mision.completada_el = fechaHoyLocal;
+      mision.fases = mision.fases.map(faseReiniciada);
+      mision.notificado_regular_el = "";
+    } else {
+      misiones[tipo].splice(indice, 1);
+    }
+    escribirJSON(CLAVE_COMPLETADAS, historial);
     escribirJSON(CLAVE_MISIONES, misiones);
-    return { ok: true, completadas: completadas.length };
+    return { ok: true, completadas: historial.length, repetible, mision, registro };
   },
 
   async completarFase(tipo, id, idFase) {
@@ -307,8 +394,77 @@ window.Almacen = {
     return { ok: true, mision };
   },
 
+  async actualizar(tipoOrigen, id, datos) {
+    if (!TIPOS_APP.includes(tipoOrigen)) throw new Error("Categoría de misión no válida.");
+    const tipoDestino = String(datos.tipo || tipoOrigen);
+    if (!TIPOS_APP.includes(tipoDestino)) throw new Error("Categoría de misión no válida.");
+    const titulo = String(datos.titulo || "").trim();
+    if (!titulo) throw new Error("El título es obligatorio.");
+    const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
+    const indice = misiones[tipoOrigen].findIndex((item) => item.id === id);
+    if (indice < 0) throw new Error("Misión no encontrada.");
+    const mision = misiones[tipoOrigen][indice];
+    const reglas = validarFechasYRegular(datos, mision.fecha_inicio || "");
+    const grafo = prepararFases(datos.fases, datos.dependencias, hoyLocal(), mision.fases);
+    const fasesAntiguas = new Map(mision.fases.map((fase) => [fase.id, fase]));
+    grafo.fases.forEach((fase) => {
+      const antigua = fasesAntiguas.get(fase.id);
+      if (!antigua) return;
+      fase.completada = Boolean(antigua.completada);
+      fase.fecha_completada = antigua.fecha_completada || "";
+      if (fase.fecha_inicio === antigua.fecha_inicio && fase.hora_aviso_inicio === antigua.hora_aviso_inicio) fase.notificado_inicio = antigua.notificado_inicio || "";
+      if (fase.fecha_fin === antigua.fecha_fin && fase.hora_aviso_fin === antigua.hora_aviso_fin) fase.notificado_fin = antigua.notificado_fin || "";
+    });
+    const fechasOAlertasCambiadas = mision.fecha_inicio !== reglas.inicio
+      || mision.fecha_fin !== reglas.fin
+      || mision.hora_aviso_inicio !== reglas.horaInicio
+      || mision.hora_aviso_fin !== reglas.horaFin;
+    Object.assign(mision, {
+      titulo: titulo.slice(0, 160),
+      descripcion: String(datos.descripcion || "").trim().slice(0, 1000),
+      fecha_inicio: reglas.inicio,
+      fecha_fin: reglas.fin,
+      notificar_inicio: Boolean(datos.notificar_inicio),
+      notificar_fin: Boolean(datos.notificar_fin),
+      hora_aviso_inicio: reglas.horaInicio,
+      hora_aviso_fin: reglas.horaFin,
+      regular: reglas.regular,
+      dias_regular: reglas.dias,
+      hora_regular: reglas.horaRegular,
+      notificar_regular: Boolean(datos.notificar_regular && reglas.horaRegular),
+      notificado_regular_el: mision.hora_regular !== reglas.horaRegular ? "" : mision.notificado_regular_el,
+      fases: grafo.fases,
+      dependencias: grafo.dependencias,
+    });
+    if (fechasOAlertasCambiadas) {
+      mision.notificado_inicio = "";
+      mision.notificado_fin = "";
+    }
+    if (tipoDestino !== tipoOrigen) {
+      misiones[tipoOrigen].splice(indice, 1);
+      misiones[tipoDestino].push(mision);
+    }
+    if (tipoDestino !== "diarias" && !mision.regular) mision.completada_el = "";
+    escribirJSON(CLAVE_MISIONES, misiones);
+    return { ok: true, tipo: tipoDestino, mision };
+  },
+
+  async cancelar(tipo, id) {
+    if (!TIPOS_APP.includes(tipo)) throw new Error("Categoría de misión no válida.");
+    const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
+    const indice = misiones[tipo].findIndex((mision) => mision.id === id);
+    if (indice < 0) throw new Error("Misión no encontrada.");
+    const [mision] = misiones[tipo].splice(indice, 1);
+    escribirJSON(CLAVE_MISIONES, misiones);
+    return { ok: true, mision };
+  },
+
+  async historial() {
+    return leerHistorial().sort((a, b) => String(b.fecha_completada).localeCompare(String(a.fecha_completada)));
+  },
+
   async marcarNotificada(tipo, id, extremo, fecha, idFase = "") {
-    if (!TIPOS_APP.includes(tipo) || !["inicio", "fin"].includes(extremo)) {
+    if (!TIPOS_APP.includes(tipo) || !["inicio", "fin", "regular"].includes(extremo)) {
       throw new Error("Datos de notificación no válidos.");
     }
     const misiones = normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias()));
@@ -316,13 +472,15 @@ window.Almacen = {
     if (!mision) throw new Error("Misión no encontrada.");
     const objetivo = idFase ? mision.fases.find((fase) => fase.id === idFase) : mision;
     if (!objetivo) throw new Error("Fase no encontrada.");
-    objetivo[`notificado_${extremo}`] = String(fecha || "").slice(0, 10);
+    if (extremo === "regular" && idFase) throw new Error("El aviso de recurrencia pertenece a la misión.");
+    const campo = extremo === "regular" ? "notificado_regular_el" : `notificado_${extremo}`;
+    objetivo[campo] = String(fecha || "").slice(0, 10);
     escribirJSON(CLAVE_MISIONES, misiones);
     return { ok: true };
   },
 
   async descargarCSV() {
-    const completadas = leerJSON(CLAVE_COMPLETADAS, []);
+    const completadas = leerHistorial();
     if (completadas.length === 0) {
       throw new Error("Todavía no hay misiones completadas.");
     }
@@ -339,7 +497,7 @@ window.Almacen = {
       version: 1,
       exportado: fechaAhora(),
       misiones: normalizarMisiones(leerJSON(CLAVE_MISIONES, misionesVacias())),
-      completadas: leerJSON(CLAVE_COMPLETADAS, []),
+      completadas: leerHistorial(),
     };
     descargar(
       `misiones-copia-${new Date().toISOString().slice(0, 10)}.json`,
