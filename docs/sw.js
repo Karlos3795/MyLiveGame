@@ -5,7 +5,7 @@
 
 "use strict";
 
-const CACHE = "mylivegame-app-fc9b96aa";
+const CACHE = "mylivegame-app-ee68f102";
 
 const RECURSOS = [
   "./",

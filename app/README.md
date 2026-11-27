@@ -1,4 +1,4 @@
-# MyLiveGame (beta 2.0) — versión app (móvil y ordenador)
+# MyLiveGame (beta 2.0.3) — versión app (móvil y ordenador)
 
 Aplicación instalable tipo **PWA**: se abre como una app (sin barra del
 navegador), funciona **sin conexión** y guarda todos los datos **en el propio

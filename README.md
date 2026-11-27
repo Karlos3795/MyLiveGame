@@ -1,4 +1,4 @@
-# MyLiveGame (beta)
+# MyLiveGame (beta 2.0.3)
 
 Convierte tus tareas en misiones. El proyecto está en fase beta y ofrece una
 aplicación instalable y una versión web con servidor propio.
@@ -15,7 +15,14 @@ guardan en el dispositivo y se pueden exportar con **Copia de seguridad**.
 
 ## Versiones (beta)
 
-### 2.0 (beta) — actual
+### 2.0.3 (beta) — actualización más reciente
+
+- Refresco del nombre del acceso instalado y del icono MLG: solo el monograma
+  negro sobre un degradado rosa, coral, naranja, violeta y turquesa.
+- Recursos de icono versionados y actualización del service worker para reducir
+  el uso de imágenes guardadas en caché.
+
+### 2.0 (beta)
 
 - Historial de completadas con búsqueda por título y filtros por fechas y tipo.
 - Edición y cancelación de misiones desde sus ajustes.
@@ -23,7 +30,7 @@ guardan en el dispositivo y se pueden exportar con **Copia de seguridad**.
 - Misiones diarias que vuelven a activarse y misiones regulares con días de la
   semana seleccionables.
 - Horas de aviso configurables para inicio, fin y recordatorios semanales.
-- Nombre **MyLiveGame** e icono MLG sobre un fondo de atardecer.
+- Nombre **MyLiveGame** y nueva identidad visual.
 
 ### 1.5 (beta)
 
