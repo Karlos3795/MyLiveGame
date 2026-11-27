@@ -5,7 +5,7 @@
 
 "use strict";
 
-const CACHE = "mylivegame-app-2376d4ff";
+const CACHE = "mylivegame-app-e749a994";
 
 const RECURSOS = [
   "./",
@@ -14,11 +14,11 @@ const RECURSOS = [
   "./nucleo.js",
   "./almacen.js",
   "./manifest.webmanifest",
-  "./iconos/icono-192.png",
-  "./iconos/icono-512.png",
-  "./iconos/icono-maskable-512.png",
-  "./iconos/apple-touch-icon.png",
-  "./iconos/favicon-64.png",
+  "./iconos/icono-192.png?v=2.0.1",
+  "./iconos/icono-512.png?v=2.0.1",
+  "./iconos/icono-maskable-512.png?v=2.0.1",
+  "./iconos/apple-touch-icon.png?v=2.0.1",
+  "./iconos/favicon-64.png?v=2.0.1",
 ];
 
 self.addEventListener("install", (evento) => {
