@@ -11,9 +11,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MyLiveGame">
-  <link rel="manifest" href="manifest.webmanifest?v=2.0.2">
-  <link rel="icon" type="image/png" sizes="64x64" href="iconos/favicon-64.png?v=2.0.2">
-  <link rel="apple-touch-icon" sizes="180x180" href="iconos/apple-touch-icon.png?v=2.0.2">
+  <link rel="manifest" href="manifest.webmanifest?v=2.0.3">
+  <link rel="icon" type="image/png" sizes="64x64" href="iconos/favicon-64.png?v=2.0.3">
+  <link rel="apple-touch-icon" sizes="180x180" href="iconos/apple-touch-icon.png?v=2.0.3">
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-tipo="principales">
@@ -22,7 +22,7 @@
 
   <header class="hud">
     <div class="marca">
-      <img class="logo-mlg" src="iconos/favicon-64.png?v=2.0.2" alt="">
+      <img class="logo-mlg" src="iconos/favicon-64.png?v=2.0.3" alt="">
       <div>
         <h1>MyLiveGame</h1>
         <p class="lema-app">Tu campaña personal · beta 2.0</p>
@@ -276,6 +276,23 @@
   <script src="nucleo.js"></script>
   <script>
     if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+      const recargaClave = "mylivegame-serviceworker-recarga";
+      let ignorarSiguienteCambio = sessionStorage.getItem(recargaClave) === "1";
+      if (ignorarSiguienteCambio) {
+        sessionStorage.removeItem(recargaClave);
+        window.setTimeout(function () { ignorarSiguienteCambio = false; }, 1500);
+      }
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (ignorarSiguienteCambio) {
+          ignorarSiguienteCambio = false;
+          return;
+        }
+        // Esperar si hay una misión en edición para no descartar campos sin guardar.
+        if (document.querySelector("dialog[open]")) return;
+        sessionStorage.setItem(recargaClave, "1");
+        ignorarSiguienteCambio = true;
+        window.location.reload();
+      });
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then(function (registro) {
           return registro.update();
